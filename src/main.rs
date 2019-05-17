@@ -1,9 +1,12 @@
 extern crate clap;
 extern crate notify;
+extern crate rayon;
 
 use clap::{Arg, App};
-//use crossbeam_channel::{unbounded};
+use rayon::{ThreadPoolBuilder, scope};
+use rayon::prelude::*;
 use std::path::{Path};
+
 
 mod lib;
 use lib::{watch_and_archive};
@@ -35,10 +38,23 @@ fn main() {
         )
         .get_matches();
 
-    let base = Path::new(matches.value_of("spool").unwrap());
-    let archive = Path::new(matches.value_of("archive").unwrap());
+    let base = Path::new(matches.value_of("spool").expect("You must provide the location of the hash dirs."));
+    let archive = Path::new(matches.value_of("archive").expect("You must provide the location of the archive"));
 
     // TODO: check the base exists
-
-    watch_and_archive(&archive, &base, 0);
+    let pool = ThreadPoolBuilder::new().num_threads(22).build().unwrap();
+    scope(|s| {
+        for hash in 0..9 { 
+            println!("Watching hash.{}", &hash);
+            let b = &base;
+            let a = &archive;
+            let h = hash.clone();
+            s.spawn(move |_| {
+                match watch_and_archive(a, b, &h) {
+                    Ok(_) => println!("Stopped watching hash.{}", &hash),
+                    Err(e) => panic!(format!("Oops: {:?}", e))
+                }
+            });
+        };
+        });
 }

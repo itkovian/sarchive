@@ -41,7 +41,7 @@ fn archive_script(archive: &Path, event: DebouncedEvent) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn watch_and_archive(archive: &Path, base: &Path, hash: u8) -> notify::Result<()> {
+pub fn watch_and_archive(archive: &Path, base: &Path, hash: &u8) -> notify::Result<()> {
 
     let (tx, rx) = channel();
 
