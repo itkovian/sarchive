@@ -23,7 +23,7 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
 fn archive_script(archive: &Path, event: DebouncedEvent) -> Result<(), Error> {
     println!("Event received: {:?}", event);
     match event {
-        DebouncedEvent::Create(path) => {
+        DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
             if let Some((jobid, job_filename)) = is_job_path(&path) {
                 let target_path = archive.join(format!("job.{}_{}", &jobid, &job_filename));
                 match copy(&path, &target_path) {
