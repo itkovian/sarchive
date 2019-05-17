@@ -34,9 +34,7 @@ fn archive_script(archive: &Path, event: DebouncedEvent) -> Result<(), Error> {
             if let Some((jobid, job_filename)) = is_job_path(&path) {
                 let target_path = archive.join(format!("job.{}_{}", &jobid, &job_filename));
                 match copy(&path, &target_path) {
-                    Ok(bytes) => { 
-                        println!("{} bytes copied to {:?}", bytes, &target_path)
-                    },
+                    Ok(bytes) => println!("{} bytes copied to {:?}", bytes, &target_path),
                     Err(e)    => { 
                         println!("Copy of {:?} to {:?} failed: {:?}", &path, &target_path, e);
                         return Err(e);
@@ -109,4 +107,44 @@ fn main() {
     // TODO: check the base exists
 
     watch_and_copy(&archive, &base, 0);
+}
+
+#[cfg(test)]
+mod tests {
+
+    extern crate tempfile;
+
+    use std::path::{Path};
+    use tempfile::{tempfile, tempdir};
+    use super::*;
+    use std::fs::{File, create_dir, remove_dir};
+    use std::io::{Write};
+
+    #[test]
+    fn test_is_job_path() {
+
+        let tdir = tempdir().unwrap();
+
+        // this should pass
+        let jobdir = tdir.path().join("job.1234");
+        let _dir = create_dir(&jobdir);
+        let file_path = jobdir.join("script");
+        {
+            let mut file = File::create(&file_path).unwrap();
+            write!(file, "This is my jobscript").unwrap();
+        }
+        assert_eq!(is_job_path(&file_path), Some(("1234", "script")));
+
+        // this should fail
+        let fdir = tdir.path().join("fubar");
+        let _faildir = create_dir(&fdir);
+        let file_fail_path = fdir.join("script");
+        {
+            let mut file = File::create(&file_fail_path).unwrap();
+            write!(file, "This is not a jobscript").unwrap();   
+        }
+        assert_eq!(is_job_path(&file_fail_path), None);
+    }
+
+
 }
