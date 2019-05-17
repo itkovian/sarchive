@@ -42,8 +42,8 @@ fn main() {
     let archive = Path::new(matches.value_of("archive").expect("You must provide the location of the archive"));
 
     // TODO: check the base exists
-    let pool = ThreadPoolBuilder::new().num_threads(22).build().unwrap();
-    scope(|s| {
+    let pool = ThreadPoolBuilder::new().num_threads(10).build().unwrap();
+    pool.scope(|s| {
         for hash in 0..10 { 
             println!("Watching hash.{}", &hash);
             let b = &base;
