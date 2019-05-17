@@ -44,7 +44,7 @@ fn main() {
     // TODO: check the base exists
     let pool = ThreadPoolBuilder::new().num_threads(22).build().unwrap();
     scope(|s| {
-        for hash in 0..9 { 
+        for hash in 0..10 { 
             println!("Watching hash.{}", &hash);
             let b = &base;
             let a = &archive;
