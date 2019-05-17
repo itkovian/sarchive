@@ -3,7 +3,7 @@ extern crate notify;
 extern crate rayon;
 
 use clap::{Arg, App};
-use rayon::{ThreadPoolBuilder, scope};
+use rayon::{ThreadPoolBuilder};
 use rayon::prelude::*;
 use std::path::{Path};
 
