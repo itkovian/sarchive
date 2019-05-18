@@ -68,6 +68,6 @@ fn main() {
                 }});
         }
         let q = &jobscript_q;
-        s.spawn(move |_| process(q));
+        s.spawn(move |_| process(archive, q));
     });
 }

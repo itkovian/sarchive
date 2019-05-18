@@ -43,7 +43,6 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
 }
 
 
-
 fn archive(archive: &Path, j: &SlurmJobEntry) -> Result<(), Error> {
     let target_path = archive.join(format!("job.{}_{}", &j.jobid, &j.filename));
     match copy(&j.path, &target_path) {
@@ -95,6 +94,15 @@ pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>) -> notify::Re
     Ok(())
 }
 
+pub fn process(archive_path: &Path, q: &SegQueue<SlurmJobEntry>) {
+
+    loop {
+        if let Ok(j) = q.pop() {
+            archive(&archive_path, &j);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -131,5 +139,3 @@ mod tests {
         assert_eq!(is_job_path(&file_fail_path), None);
     }
 }
-
-pub fn process(q: &SegQueue<SlurmJobEntry>) {}
