@@ -1,13 +1,15 @@
 extern crate clap;
+extern crate crossbeam_queue;
+extern crate crossbeam_utils;
 extern crate notify;
-extern crate rayon;
 
 use clap::{App, Arg};
-use rayon::ThreadPoolBuilder;
+use crossbeam_queue::SegQueue;
+use crossbeam_utils::thread::scope;
 use std::path::Path;
 
 mod lib;
-use lib::watch_and_archive;
+use lib::{monitor, process};
 
 fn main() {
     let matches = App::new("SArchive")
@@ -51,17 +53,21 @@ fn main() {
     );
 
     // TODO: check the base exists
-    let pool = ThreadPoolBuilder::new().num_threads(10).build().unwrap();
-    pool.scope(|s| {
-        for hash in 0..10 {
+    let jobscript_q = SegQueue::new();
+    let hash_range = 0..10;
+
+    scope(|s| {
+        for hash in hash_range {
             println!("Watching hash.{}", &hash);
-            let b = &base;
-            let a = &archive;
-            let h = hash.clone();
-            s.spawn(move |_| match watch_and_archive(a, b, &h) {
-                Ok(_) => println!("Stopped watching hash.{}", &hash),
-                Err(e) => panic!(format!("Oops: {:?}", e)),
-            });
+            let h = hash.clone(); 
+            let q = &jobscript_q;
+            s.spawn(move |_| {
+                match monitor(base, h, q) {
+                    Ok(_) => println!("Stopped watching hash.{}", h),
+                    Err(e) => panic!(format!("Oops: {:?}", e)),
+                }});
         }
+        let q = &jobscript_q;
+        s.spawn(move |_| process(q));
     });
 }

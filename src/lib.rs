@@ -1,9 +1,31 @@
+extern crate crossbeam_queue;
+extern crate crossbeam_utils;
+
+use crossbeam_queue::SegQueue;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::copy;
 use std::io::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::Duration;
+
+
+pub struct SlurmJobEntry {
+    path: PathBuf,
+    jobid: String,
+    filename: String,
+}
+
+impl SlurmJobEntry {
+    fn new(p: &PathBuf, id: &str, f: &str) -> SlurmJobEntry {
+        SlurmJobEntry {
+            path: p.clone(),
+            jobid: id.to_string(),
+            filename: f.to_string()
+        }
+    } 
+}
+
 
 fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     // e.g., /var/spool/slurm/hash.1/job.0021/script
@@ -20,19 +42,28 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     None
 }
 
-fn archive(archive: &Path, event: DebouncedEvent) -> Result<(), Error> {
+
+
+fn archive(archive: &Path, j: &SlurmJobEntry) -> Result<(), Error> {
+    let target_path = archive.join(format!("job.{}_{}", &j.jobid, &j.filename));
+    match copy(&j.path, &target_path) {
+        Ok(bytes) => println!("{} bytes copied to {:?}", bytes, &target_path),
+        Err(e) => {
+            println!("Copy of {:?} to {:?} failed: {:?}", &j.path, &target_path, e);
+            return Err(e);
+        }
+    };
+    Ok(())
+}
+
+
+fn check_and_queue(q: &SegQueue<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
     println!("Event received: {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
             if let Some((jobid, job_filename)) = is_job_path(&path) {
-                let target_path = archive.join(format!("job.{}_{}", &jobid, &job_filename));
-                match copy(&path, &target_path) {
-                    Ok(bytes) => println!("{} bytes copied to {:?}", bytes, &target_path),
-                    Err(e) => {
-                        println!("Copy of {:?} to {:?} failed: {:?}", &path, &target_path, e);
-                        return Err(e);
-                    }
-                };
+                let e = SlurmJobEntry::new(&path, jobid, job_filename);
+                q.push(e);
             };
         }
         // We ignore all other events
@@ -41,7 +72,8 @@ fn archive(archive: &Path, event: DebouncedEvent) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn watch_and_archive(archive_path: &Path, base: &Path, hash: &u8) -> notify::Result<()> {
+
+pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>) -> notify::Result<()> {
     let (tx, rx) = channel();
 
     // create a platform-specific watcher
@@ -49,12 +81,10 @@ pub fn watch_and_archive(archive_path: &Path, base: &Path, hash: &u8) -> notify:
     let path = base.join(format!("hash.{}", hash));
 
     // TODO: check the path exists!
-
     watcher.watch(&path, RecursiveMode::Recursive)?;
-
     loop {
         match rx.recv() {
-            Ok(event) => archive(&archive_path, event)?,
+            Ok(event) => check_and_queue(q, event)?,
             Err(e) => {
                 println!("Error on received event: {:?}", e);
                 break;
@@ -101,3 +131,5 @@ mod tests {
         assert_eq!(is_job_path(&file_fail_path), None);
     }
 }
+
+pub fn process(q: &SegQueue<SlurmJobEntry>) {}

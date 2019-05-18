@@ -8,6 +8,10 @@ license = "MIT"
 
 [dependencies]
 clap = "2.33"
+crossbeam = "0.7.1"
+crossbeam-queue = "0.1.2"
+crossbeam-utils = "0.6.5"
+
 notify = "^4.0.11"
 libc = "^0.2.4"
 rayon = "^1.0.3"
