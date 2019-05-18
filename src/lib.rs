@@ -1,7 +1,7 @@
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
-use std::fs::{copy};
-use std::io::{Error};
-use std::path::{Path};
+use std::fs::copy;
+use std::io::Error;
+use std::path::Path;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
@@ -12,15 +12,15 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
         let file = path.file_name().unwrap().to_str().unwrap();
         let parent = path.parent().unwrap();
         let jobname = parent.file_name().unwrap().to_str().unwrap();
-        
+
         if jobname.starts_with("job.") {
-            return Some((parent.extension().unwrap().to_str().unwrap(), file))
+            return Some((parent.extension().unwrap().to_str().unwrap(), file));
         };
     }
     None
 }
 
-fn archive_script(archive: &Path, event: DebouncedEvent) -> Result<(), Error> {
+fn archive(archive: &Path, event: DebouncedEvent) -> Result<(), Error> {
     println!("Event received: {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
@@ -28,25 +28,24 @@ fn archive_script(archive: &Path, event: DebouncedEvent) -> Result<(), Error> {
                 let target_path = archive.join(format!("job.{}_{}", &jobid, &job_filename));
                 match copy(&path, &target_path) {
                     Ok(bytes) => println!("{} bytes copied to {:?}", bytes, &target_path),
-                    Err(e)    => { 
+                    Err(e) => {
                         println!("Copy of {:?} to {:?} failed: {:?}", &path, &target_path, e);
                         return Err(e);
                     }
                 };
             };
-        },
+        }
         // We ignore all other events
-        _ => ()
+        _ => (),
     }
     Ok(())
 }
 
-pub fn watch_and_archive(archive: &Path, base: &Path, hash: &u8) -> notify::Result<()> {
-
+pub fn watch_and_archive(archive_path: &Path, base: &Path, hash: &u8) -> notify::Result<()> {
     let (tx, rx) = channel();
 
     // create a platform-specific watcher
-    let mut watcher:RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;  
+    let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
     let path = base.join(format!("hash.{}", hash));
 
     // TODO: check the path exists!
@@ -55,10 +54,10 @@ pub fn watch_and_archive(archive: &Path, base: &Path, hash: &u8) -> notify::Resu
 
     loop {
         match rx.recv() {
-            Ok(event) => archive_script(&archive, event)?,
+            Ok(event) => archive(&archive_path, event)?,
             Err(e) => {
                 println!("Error on received event: {:?}", e);
-                break; 
+                break;
             }
         };
     }
@@ -66,22 +65,19 @@ pub fn watch_and_archive(archive: &Path, base: &Path, hash: &u8) -> notify::Resu
     Ok(())
 }
 
-
-
 #[cfg(test)]
 mod tests {
 
     extern crate tempfile;
 
-    use std::path::{Path};
-    use tempfile::{tempfile, tempdir};
     use super::*;
-    use std::fs::{File, create_dir, remove_dir};
-    use std::io::{Write};
+    use std::fs::{create_dir, remove_dir, File};
+    use std::io::Write;
+    use std::path::Path;
+    use tempfile::{tempdir, tempfile};
 
     #[test]
     fn test_is_job_path() {
-
         let tdir = tempdir().unwrap();
 
         // this should pass
@@ -100,10 +96,8 @@ mod tests {
         let file_fail_path = fdir.join("script");
         {
             let mut file = File::create(&file_fail_path).unwrap();
-            write!(file, "This is not a jobscript").unwrap();   
+            write!(file, "This is not a jobscript").unwrap();
         }
         assert_eq!(is_job_path(&file_fail_path), None);
     }
-
-
 }
