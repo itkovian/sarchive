@@ -1,6 +1,8 @@
+extern crate crossbeam_channel;
 extern crate crossbeam_queue;
 extern crate crossbeam_utils;
 
+use crossbeam_channel::{Receiver, Sender};
 use crossbeam_queue::SegQueue;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::copy;
@@ -56,13 +58,13 @@ fn archive(archive: &Path, j: &SlurmJobEntry) -> Result<(), Error> {
 }
 
 
-fn check_and_queue(q: &SegQueue<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
+fn check_and_queue(s: &Sender<SlurmJobEntry>, q: &SegQueue<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
     println!("Event received: {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
             if let Some((jobid, job_filename)) = is_job_path(&path) {
                 let e = SlurmJobEntry::new(&path, jobid, job_filename);
-                q.push(e);
+                s.send(e).unwrap();
             };
         }
         // We ignore all other events
@@ -72,7 +74,7 @@ fn check_and_queue(q: &SegQueue<SlurmJobEntry>, event: DebouncedEvent) -> Result
 }
 
 
-pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>) -> notify::Result<()> {
+pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>, s: &Sender<SlurmJobEntry>) -> notify::Result<()> {
     let (tx, rx) = channel();
 
     // create a platform-specific watcher
@@ -83,7 +85,7 @@ pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>) -> notify::Re
     watcher.watch(&path, RecursiveMode::Recursive)?;
     loop {
         match rx.recv() {
-            Ok(event) => check_and_queue(q, event)?,
+            Ok(event) => check_and_queue(s, q, event)?,
             Err(e) => {
                 println!("Error on received event: {:?}", e);
                 break;
@@ -94,13 +96,14 @@ pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>) -> notify::Re
     Ok(())
 }
 
-pub fn process(archive_path: &Path, q: &SegQueue<SlurmJobEntry>) {
+pub fn process(archive_path: &Path, q: &SegQueue<SlurmJobEntry>, r: &Receiver<SlurmJobEntry>) {
 
     loop {
-        if let Ok(j) = q.pop() {
+        if let Ok(j) = r.recv() {
             archive(&archive_path, &j);
         }
     }
+
 }
 
 #[cfg(test)]

@@ -1,9 +1,11 @@
 extern crate clap;
+extern crate crossbeam_channel;
 extern crate crossbeam_queue;
 extern crate crossbeam_utils;
 extern crate notify;
 
 use clap::{App, Arg};
+use crossbeam_channel::unbounded;
 use crossbeam_queue::SegQueue;
 use crossbeam_utils::thread::scope;
 use std::path::Path;
@@ -56,18 +58,21 @@ fn main() {
     let jobscript_q = SegQueue::new();
     let hash_range = 0..10;
 
+    let (sender, receiver) = unbounded();
     scope(|s| {
         for hash in hash_range {
             println!("Watching hash.{}", &hash);
             let h = hash.clone(); 
             let q = &jobscript_q;
+            let t = &sender;
             s.spawn(move |_| {
-                match monitor(base, h, q) {
+                match monitor(base, h, q, t) {
                     Ok(_) => println!("Stopped watching hash.{}", h),
                     Err(e) => panic!(format!("Oops: {:?}", e)),
                 }});
         }
         let q = &jobscript_q;
-        s.spawn(move |_| process(archive, q));
+        let r = &receiver;
+        s.spawn(move |_| process(archive, q, r));
     });
 }
