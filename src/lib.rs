@@ -58,7 +58,7 @@ fn archive(archive: &Path, j: &SlurmJobEntry) -> Result<(), Error> {
 }
 
 
-fn check_and_queue(s: &Sender<SlurmJobEntry>, q: &SegQueue<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
+fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
     println!("Event received: {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
@@ -74,7 +74,7 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, q: &SegQueue<SlurmJobEntry>, event
 }
 
 
-pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>, s: &Sender<SlurmJobEntry>) -> notify::Result<()> {
+pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Result<()> {
     let (tx, rx) = channel();
 
     // create a platform-specific watcher
@@ -85,7 +85,7 @@ pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>, s: &Sender<Sl
     watcher.watch(&path, RecursiveMode::Recursive)?;
     loop {
         match rx.recv() {
-            Ok(event) => check_and_queue(s, q, event)?,
+            Ok(event) => check_and_queue(s, event)?,
             Err(e) => {
                 println!("Error on received event: {:?}", e);
                 break;
@@ -96,12 +96,16 @@ pub fn monitor(base: &Path, hash: u8, q: &SegQueue<SlurmJobEntry>, s: &Sender<Sl
     Ok(())
 }
 
-pub fn process(archive_path: &Path, q: &SegQueue<SlurmJobEntry>, r: &Receiver<SlurmJobEntry>) {
+pub fn process(archive_path: &Path, r: &Receiver<SlurmJobEntry>) {
 
     loop {
-        if let Ok(j) = r.recv() {
-            archive(&archive_path, &j);
-        }
+        match r.recv() {
+            Ok(slurm_job_entry) => archive(&archive_path, &slurm_job_entry),
+            Err(e) => {
+                println!("Error on receiving SlurmJobEntry info");
+                Ok(())
+            }
+        };
     }
 
 }
