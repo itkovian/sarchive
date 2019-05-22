@@ -1,9 +1,30 @@
+/*
+Copyright 2019 Andy Georges <itkovian+sarchive@gmail.com>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
 extern crate crossbeam_channel;
-extern crate crossbeam_queue;
 extern crate crossbeam_utils;
+#[macro_use]
+extern crate slog;
 
 use crossbeam_channel::{Receiver, Sender};
-use crossbeam_queue::SegQueue;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::copy;
 use std::io::Error;
@@ -11,10 +32,13 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
-
+/// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
+    /// The full path to the file that needs to be archived
     path: PathBuf,
+    /// The job ID
     jobid: String,
+    /// The filename in the job directory, this will be a suffix of the archived filename
     filename: String,
 }
 
@@ -28,10 +52,18 @@ impl SlurmJobEntry {
     } 
 }
 
-
+/// Verifies that the path metioned in the event is a that of a file that
+/// needs archival
+///
+/// This ignores the path prefix, but verifies that 
+/// - the path points to a file
+/// - there is a path dir component that starts with "job."
+/// 
+/// For example, /var/spool/slurm/hash.3/job.01234./script is a valid path
+///
+/// We return a tuple of two strings: the job ID and the filename, wrapped in
+/// an Option.
 fn is_job_path(path: &Path) -> Option<(&str, &str)> {
-    // e.g., /var/spool/slurm/hash.1/job.0021/script
-    // what we need is the job ID (0021) and the name of the actual file (script)
     if path.is_file() {
         let file = path.file_name().unwrap().to_str().unwrap();
         let parent = path.parent().unwrap();
@@ -44,13 +76,13 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     None
 }
 
-
-fn archive(archive: &Path, j: &SlurmJobEntry) -> Result<(), Error> {
-    let target_path = archive.join(format!("job.{}_{}", &j.jobid, &j.filename));
-    match copy(&j.path, &target_path) {
-        Ok(bytes) => println!("{} bytes copied to {:?}", bytes, &target_path),
+/// Archives the file from the given SlurmJobEntry's path. 
+fn archive(archive_path: &Path, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+    let target_path = archive.join_path(format!("job.{}_{}", &slurm_job_entry.jobid, &slurm_job_entry.filename));
+    match copy(&slurm_job_entry.path, &target_path) {
+        Ok(bytes) => info!("copied {} bytes from {:?} to {:?}", bytes, &slurm_job_entry.path, &target_path),
         Err(e) => {
-            println!("Copy of {:?} to {:?} failed: {:?}", &j.path, &target_path, e);
+            error!("Copy of {:?} to {:?} failed: {:?}", &slurm_job_entry.path, &target_path, e);
             return Err(e);
         }
     };
