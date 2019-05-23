@@ -106,7 +106,6 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(
     Ok(())
 }
 
-
 pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Result<()> {
     let (tx, rx) = channel();
 
@@ -140,7 +139,6 @@ pub fn process(archive_path: &Path, r: &Receiver<SlurmJobEntry>) {
             }
         };
     }
-
 }
 
 #[cfg(test)]

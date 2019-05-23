@@ -41,13 +41,15 @@ mod lib;
 use lib::{monitor, process};
 
 
-fn setup_logging(lvl: log::LevelFilter) -> Result<(), Box<std::error::Error>> {
-    let mut base_config = fern::Dispatch::new();
+fn setup_logging(level_filter: log::LevelFilter) -> Result<(), Box<std::error::Error>> {
+    let mut base_config = fern::Dispatch::new()
+        .level(level_filter);
+
     let stdout_config = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
                 "[{}][{}][{}] {}",
-                chrono::Local::now().format("%Y-%m-%d %H:%M"),
+                chrono::Local::now().to_rfc3339(),
                 record.target(),
                 record.level(),
                 message
@@ -82,10 +84,9 @@ fn main() {
                 .help("Name of the cluster where the jobs have been submitted to."),
         )
         .arg(
-            Arg::with_name("info")
-                .long("info")
-                .takes_value(false)
-                .help("Log at INFO level.")
+            Arg::with_name("debug")
+                .long("debug")
+                .help("Log at DEBUG level.")
         )
         .arg(
             Arg::with_name("spool")
@@ -98,8 +99,8 @@ fn main() {
         )
         .get_matches();
 
-    let log_filter = if matches.is_present("info") { log::LevelFilter::Info } else { log::LevelFilter::Warn };
-    setup_logging(log_filter);
+    let log_level = if matches.is_present("debug") { log::LevelFilter::Debug } else { log::LevelFilter::Info };
+    setup_logging(log_level);
 
     let base = Path::new(
         matches
