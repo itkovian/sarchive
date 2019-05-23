@@ -1,0 +1,13 @@
+[Unit]
+Description=Slurm job archival
+After=slurm.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/sarchive -s /var/spool/slurm/ -a /var/spool/slurm/job-archive
+Restart=always
+UMask=0066
+
+[Install]
+WantedBy=multi-user.target
+;Alias=sarchive.service
