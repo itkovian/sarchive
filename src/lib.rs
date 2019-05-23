@@ -21,11 +21,11 @@ SOFTWARE.
 */
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
-#[macro_use]
-extern crate slog;
+
 
 use crossbeam_channel::{Receiver, Sender};
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use log::*;
 use std::fs::copy;
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -73,14 +73,15 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
             return Some((parent.extension().unwrap().to_str().unwrap(), file));
         };
     }
+    debug!("{:?} is not a considered job path", &path);
     None
 }
 
 /// Archives the file from the given SlurmJobEntry's path. 
 fn archive(archive_path: &Path, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
-    let target_path = archive.join_path(format!("job.{}_{}", &slurm_job_entry.jobid, &slurm_job_entry.filename));
+    let target_path = archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &slurm_job_entry.filename));
     match copy(&slurm_job_entry.path, &target_path) {
-        Ok(bytes) => info!("copied {} bytes from {:?} to {:?}", bytes, &slurm_job_entry.path, &target_path),
+        Ok(bytes) => debug!("copied {} bytes from {:?} to {:?}", bytes, &slurm_job_entry.path, &target_path),
         Err(e) => {
             error!("Copy of {:?} to {:?} failed: {:?}", &slurm_job_entry.path, &target_path, e);
             return Err(e);
@@ -91,7 +92,7 @@ fn archive(archive_path: &Path, slurm_job_entry: &SlurmJobEntry) -> Result<(), E
 
 
 fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
-    println!("Event received: {:?}", event);
+    debug!("Event received: {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
             if let Some((jobid, job_filename)) = is_job_path(&path) {
@@ -119,7 +120,7 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Resu
         match rx.recv() {
             Ok(event) => check_and_queue(s, event)?,
             Err(e) => {
-                println!("Error on received event: {:?}", e);
+                error!("Error on received event: {:?}", e);
                 break;
             }
         };
@@ -134,7 +135,7 @@ pub fn process(archive_path: &Path, r: &Receiver<SlurmJobEntry>) {
         match r.recv() {
             Ok(slurm_job_entry) => archive(&archive_path, &slurm_job_entry),
             Err(e) => {
-                println!("Error on receiving SlurmJobEntry info");
+                error!("Error on receiving SlurmJobEntry info");
                 Ok(())
             }
         };

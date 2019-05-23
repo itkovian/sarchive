@@ -19,32 +19,49 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+extern crate chrono;
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 extern crate notify;
 
 #[macro_use]
-extern crate slog;
-extern crate slog_term;
+extern crate log;
+extern crate fern;
+extern crate syslog;
 
 use clap::{App, Arg};
 use crossbeam_channel::unbounded;
 use crossbeam_utils::thread::scope;
-use slog::*;
 use std::path::Path;
 use std::process::exit;
+use std::io;
 
 mod lib;
 use lib::{monitor, process};
 
-fn main() {
 
-    let plain = slog_term::PlainSyncDecorator::new(std::io::stdout());
-    let logger = Logger::root(
-        slog_term::FullFormat::new(plain)
-        .build().fuse(), o!()
-    );
+fn setup_logging(lvl: log::LevelFilter) -> Result<(), Box<std::error::Error>> {
+    let mut base_config = fern::Dispatch::new();
+    let stdout_config = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}][{}] {}",
+                chrono::Local::now().format("%Y-%m-%d %H:%M"),
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .chain(io::stdout());
+    
+    base_config.chain(stdout_config).apply()?;
+
+    Ok(())
+}
+
+
+fn main() {
 
     let matches = App::new("SArchive")
         .version("0.1.0")
@@ -65,6 +82,12 @@ fn main() {
                 .help("Name of the cluster where the jobs have been submitted to."),
         )
         .arg(
+            Arg::with_name("info")
+                .long("info")
+                .takes_value(false)
+                .help("Log at INFO level.")
+        )
+        .arg(
             Arg::with_name("spool")
                 .long("spool")
                 .short("s")
@@ -74,6 +97,9 @@ fn main() {
                 ),
         )
         .get_matches();
+
+    let log_filter = if matches.is_present("info") { log::LevelFilter::Info } else { log::LevelFilter::Warn };
+    setup_logging(log_filter);
 
     let base = Path::new(
         matches
@@ -87,11 +113,11 @@ fn main() {
     );
 
     if !base.is_dir() {
-        error!(logger, "Provided base {:?} is not a valid directory", base);
+        error!("Provided base {:?} is not a valid directory", base);
         exit(1);
     }
     if !archive.is_dir() {
-        error!(logger, "Provided archive {:?} is not a valid directory", archive);
+        error!("Provided archive {:?} is not a valid directory", archive);
         exit(1);
     }
 
@@ -100,15 +126,14 @@ fn main() {
     let (sender, receiver) = unbounded();
     scope(|s| {
         for hash in hash_range {
-            info!(logger, "Watching hash.{}", &hash);
+            info!("Watching hash.");
             let h = hash.clone(); 
             let t = &sender;
-            let l = &logger;
             s.spawn(move |_| {
                 match monitor(base, h, t) {
-                    Ok(_) => warn!(l, "Stopped watching hash.{}", h),
+                    Ok(_) => info!("Stopped watching hash"),
                     Err(e) => { 
-                        error!(l, "{}", format!("{:?}", e));
+                        error!("{}", e);
                         panic!("Error watching hash.{}", h);
                     }
                 }});
@@ -117,6 +142,6 @@ fn main() {
         s.spawn(move |_| process(archive, r));
     });
 
-    info!(logger, "Sarchive finished");
+    info!("Sarchive finished");
     exit(0);
 }
