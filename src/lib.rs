@@ -178,21 +178,11 @@ mod tests {
         // this should pass
         let jobdir = tdir.path().join("job.1234");
         let _dir = create_dir(&jobdir);
-        let file_path = jobdir.join("script");
-        {
-            let mut file = File::create(&file_path).unwrap();
-            write!(file, "This is my jobscript").unwrap();
-        }
-        assert_eq!(is_job_path(&file_path), Some(("1234", "script")));
+        assert_eq!(is_job_path(&jobdir), Some(("1234", "job.1234")));
 
         // this should fail
         let fdir = tdir.path().join("fubar");
         let _faildir = create_dir(&fdir);
-        let file_fail_path = fdir.join("script");
-        {
-            let mut file = File::create(&file_fail_path).unwrap();
-            write!(file, "This is not a jobscript").unwrap();
-        }
-        assert_eq!(is_job_path(&file_fail_path), None);
+        assert_eq!(is_job_path(&fdir), None);
     }
 }
