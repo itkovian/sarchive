@@ -19,6 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+extern crate chrono;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 
@@ -107,11 +108,12 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
 
         let target_path = {
             let archive_subdir = match p {
-                Period::Yearly => Some("YYYY"),
-                Period::Monthly => Some("YYYYMM"),
-                Period::Daily => Some("YYYYMMDD"),
+                Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
+                Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%M"))),
+                Period::Daily => Some(format!("{}", chrono::Local::now().format("%Y%m%d"))),
                 _ => None
             };
+            debug!("Archive subdir is {:?}", archive_subdir);
             match archive_subdir {
                 Some(d) => {
                     let archive_subdir_path = archive_path.join(d);
