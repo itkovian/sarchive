@@ -33,17 +33,15 @@ extern crate syslog;
 use clap::{App, Arg};
 use crossbeam_channel::unbounded;
 use crossbeam_utils::thread::scope;
+use std::io;
 use std::path::Path;
 use std::process::exit;
-use std::io;
 
 mod lib;
-use lib::{monitor, process};
-
+use lib::{monitor, process, Period};
 
 fn setup_logging(level_filter: log::LevelFilter) -> Result<(), Box<std::error::Error>> {
-    let mut base_config = fern::Dispatch::new()
-        .level(level_filter);
+    let mut base_config = fern::Dispatch::new().level(level_filter);
 
     let stdout_config = fern::Dispatch::new()
         .format(|out, message, record| {
@@ -56,15 +54,13 @@ fn setup_logging(level_filter: log::LevelFilter) -> Result<(), Box<std::error::E
             ))
         })
         .chain(io::stdout());
-    
+
     base_config.chain(stdout_config).apply()?;
 
     Ok(())
 }
 
-
 fn main() {
-
     let matches = App::new("SArchive")
         .version("0.1.0")
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
@@ -95,12 +91,35 @@ fn main() {
                 .takes_value(true)
                 .help(
                     "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
-                ),
+                )
+        )
+        .arg(
+            Arg::with_name("period")
+                .long("period")
+                .short("p")
+                .takes_value(true)
+                .possible_value("yearly")
+                .possible_value("monthly")
+                .possible_value("daily")
+                .help(
+                    "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
+                )
         )
         .get_matches();
 
-    let log_level = if matches.is_present("debug") { log::LevelFilter::Debug } else { log::LevelFilter::Info };
+    let log_level = if matches.is_present("debug") {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
     setup_logging(log_level);
+
+    let period = match matches.value_of("period") {
+        Some("yearly") => Period::Yearly,
+        Some("monthly") => Period::Monthly,
+        Some("daily") => Period::Daily,
+        _ => Period::None,
+    };
 
     let base = Path::new(
         matches
@@ -128,19 +147,18 @@ fn main() {
     scope(|s| {
         for hash in hash_range {
             info!("Watching hash.");
-            let h = hash.clone(); 
+            let h = hash.clone();
             let t = &sender;
-            s.spawn(move |_| {
-                match monitor(base, h, t) {
-                    Ok(_) => info!("Stopped watching hash"),
-                    Err(e) => { 
-                        error!("{}", e);
-                        panic!("Error watching hash.{}", h);
-                    }
-                }});
+            s.spawn(move |_| match monitor(base, h, t) {
+                Ok(_) => info!("Stopped watching hash"),
+                Err(e) => {
+                    error!("{}", e);
+                    panic!("Error watching hash.{}", h);
+                }
+            });
         }
         let r = &receiver;
-        s.spawn(move |_| process(archive, r));
+        s.spawn(move |_| process(archive, period, r));
     });
 
     info!("Sarchive finished");
