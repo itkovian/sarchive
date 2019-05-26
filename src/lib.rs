@@ -179,7 +179,10 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Resu
     let path = base.join(format!("hash.{}", hash));
 
     // TODO: check the path exists!
-    watcher.watch(&path, RecursiveMode::NonRecursive);
+    match watcher.watch(&path, RecursiveMode::NonRecursive) {
+        Err(e) => return Err(e),
+        _ => ()
+    }
     loop {
         match rx.recv() {
             Ok(event) => check_and_queue(s, event)?,
@@ -197,7 +200,7 @@ pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>) {
     loop {
         match r.recv() {
             Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
-            Err(e) => {
+            Err(_) => {
                 error!("Error on receiving SlurmJobEntry info");
                 Ok(())
             }
@@ -211,8 +214,7 @@ mod tests {
     extern crate tempfile;
 
     use super::*;
-    use std::fs::{create_dir, remove_dir, File};
-    use std::io::Write;
+    use std::fs::{create_dir};
     use std::path::Path;
     use tempfile::{tempdir};
 
