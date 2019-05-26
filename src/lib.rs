@@ -85,6 +85,36 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     None
 }
 
+/// Determines the target path for the slurm job file
+///
+/// The path will have the following components:
+/// - the archive path
+/// - a subdir depending on the Period
+///     - YYYY in case of a Yearly Period
+///     - YYYYMM in case of a Monthly Period
+///     - YYYYMMDD in case of a Daily Period 
+/// - a file with the given filename
+fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry, filename: &str) -> PathBuf {
+    let archive_subdir = match p {
+        Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
+        Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%m"))),
+        Period::Daily => Some(format!("{}", chrono::Local::now().format("%Y%m%d"))),
+        _ => None
+    };
+    debug!("Archive subdir is {:?}", &archive_subdir);
+    match archive_subdir {
+        Some(d) => {
+            let archive_subdir_path = archive_path.join(&d);
+            if !Path::exists(&archive_subdir_path) {
+                debug!("Archive subdir {:?} does not yet exist, creating", &d);
+                create_dir_all(&archive_subdir_path).unwrap();
+            }
+            archive_subdir_path.clone().join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+        },
+        None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+    }
+}
+
 /// Archives the files from the given SlurmJobEntry's path.
 fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
     // We wait for each file to be present
@@ -106,25 +136,8 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
             continue;
         }
 
-        let target_path = {
-            let archive_subdir = match p {
-                Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
-                Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%M"))),
-                Period::Daily => Some(format!("{}", chrono::Local::now().format("%Y%m%d"))),
-                _ => None
-            };
-            debug!("Archive subdir is {:?}", archive_subdir);
-            match archive_subdir {
-                Some(d) => {
-                    let archive_subdir_path = archive_path.join(d);
-                    if !Path::exists(&archive_subdir_path) {
-                        create_dir_all(&archive_subdir_path)?;
-                    }
-                    archive_subdir_path.clone().join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
-                },
-                None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
-            }
-        };
+        let target_path =  determine_target_path(&archive_path, &p, &slurm_job_entry, &filename);
+        
         match copy(&fpath, &target_path) {
             Ok(bytes) => info!(
                 "copied {} bytes from {:?} to {:?}",
@@ -147,7 +160,7 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(
     debug!("Event received: {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-            if let Some((jobid, dirname)) = is_job_path(&path) {
+            if let Some((jobid, _dirname)) = is_job_path(&path) {
                 let e = SlurmJobEntry::new(&path, jobid);
                 s.send(e).unwrap();
             };
@@ -166,7 +179,10 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Resu
     let path = base.join(format!("hash.{}", hash));
 
     // TODO: check the path exists!
-    watcher.watch(&path, RecursiveMode::NonRecursive);
+    match watcher.watch(&path, RecursiveMode::NonRecursive) {
+        Err(e) => return Err(e),
+        _ => ()
+    }
     loop {
         match rx.recv() {
             Ok(event) => check_and_queue(s, event)?,
@@ -184,7 +200,7 @@ pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>) {
     loop {
         match r.recv() {
             Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
-            Err(e) => {
+            Err(_) => {
                 error!("Error on receiving SlurmJobEntry info");
                 Ok(())
             }
@@ -198,10 +214,9 @@ mod tests {
     extern crate tempfile;
 
     use super::*;
-    use std::fs::{create_dir, remove_dir, File};
-    use std::io::Write;
+    use std::fs::{create_dir};
     use std::path::Path;
-    use tempfile::{tempdir, tempfile};
+    use tempfile::{tempdir};
 
     #[test]
     fn test_is_job_path() {
@@ -216,5 +231,39 @@ mod tests {
         let fdir = tdir.path().join("fubar");
         let _faildir = create_dir(&fdir);
         assert_eq!(is_job_path(&fdir), None);
+    }
+
+    #[test]
+    fn test_determine_target_path() {
+
+        let tdir = tempdir().unwrap();
+
+        // create the basic archive path
+        let archive_dir = tdir.path();
+        let _dir = create_dir(&archive_dir);
+        let slurm_job_entry = SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
+
+        let p = Period::None;
+        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
+
+        assert_eq!(target_path, archive_dir.join(format!("job.1234_foobar")));
+
+        let d = format!("{}", chrono::Local::now().format("%Y"));
+        let p = Period::Yearly;
+        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
+
+        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
+
+        let d = format!("{}", chrono::Local::now().format("%Y%m"));
+        let p = Period::Monthly;
+        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
+
+        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
+
+        let d = format!("{}", chrono::Local::now().format("%Y%m%d"));
+        let p = Period::Daily;
+        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
+
+        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
     }
 }

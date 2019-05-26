@@ -40,8 +40,8 @@ use std::process::exit;
 mod lib;
 use lib::{monitor, process, Period};
 
-fn setup_logging(level_filter: log::LevelFilter) -> Result<(), Box<std::error::Error>> {
-    let mut base_config = fern::Dispatch::new().level(level_filter);
+fn setup_logging(level_filter: log::LevelFilter) -> Result<(), log::SetLoggerError> {
+    let base_config = fern::Dispatch::new().level(level_filter);
 
     let stdout_config = fern::Dispatch::new()
         .format(|out, message, record| {
@@ -55,9 +55,7 @@ fn setup_logging(level_filter: log::LevelFilter) -> Result<(), Box<std::error::E
         })
         .chain(io::stdout());
 
-    base_config.chain(stdout_config).apply()?;
-
-    Ok(())
+    base_config.chain(stdout_config).apply()
 }
 
 fn main() {
@@ -112,7 +110,10 @@ fn main() {
     } else {
         log::LevelFilter::Info
     };
-    setup_logging(log_level);
+    match setup_logging(log_level) {
+        Ok(_) => (),
+        Err(e) => panic!("Cannot set up logging: {:?}", e)
+    };
 
     let period = match matches.value_of("period") {
         Some("yearly") => Period::Yearly,
