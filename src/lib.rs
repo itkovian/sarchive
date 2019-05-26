@@ -85,6 +85,26 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     None
 }
 
+fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry, filename: &str) -> PathBuf {
+    let archive_subdir = match p {
+        Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
+        Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%M"))),
+        Period::Daily => Some(format!("{}", chrono::Local::now().format("%Y%m%d"))),
+        _ => None
+    };
+    debug!("Archive subdir is {:?}", archive_subdir);
+    match archive_subdir {
+        Some(d) => {
+            let archive_subdir_path = archive_path.join(d);
+            if !Path::exists(&archive_subdir_path) {
+                create_dir_all(&archive_subdir_path).unwrap();
+            }
+            archive_subdir_path.clone().join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+        },
+        None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+    }
+}
+
 /// Archives the files from the given SlurmJobEntry's path.
 fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
     // We wait for each file to be present
@@ -106,25 +126,8 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
             continue;
         }
 
-        let target_path = {
-            let archive_subdir = match p {
-                Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
-                Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%M"))),
-                Period::Daily => Some(format!("{}", chrono::Local::now().format("%Y%m%d"))),
-                _ => None
-            };
-            debug!("Archive subdir is {:?}", archive_subdir);
-            match archive_subdir {
-                Some(d) => {
-                    let archive_subdir_path = archive_path.join(d);
-                    if !Path::exists(&archive_subdir_path) {
-                        create_dir_all(&archive_subdir_path)?;
-                    }
-                    archive_subdir_path.clone().join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
-                },
-                None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
-            }
-        };
+        let target_path =  determine_target_path(&archive_path, &p, &slurm_job_entry, &filename);
+        
         match copy(&fpath, &target_path) {
             Ok(bytes) => info!(
                 "copied {} bytes from {:?} to {:?}",
@@ -147,7 +150,7 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(
     debug!("Event received: {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-            if let Some((jobid, dirname)) = is_job_path(&path) {
+            if let Some((jobid, _dirname)) = is_job_path(&path) {
                 let e = SlurmJobEntry::new(&path, jobid);
                 s.send(e).unwrap();
             };
