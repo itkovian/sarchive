@@ -90,7 +90,7 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
     // We wait for each file to be present
     let ten_millis = Duration::from_millis(10);
     for filename in vec!["script", "environment"] {
-        let fpath = slurm_job_entry.path.join("script");
+        let fpath = slurm_job_entry.path.join(filename);
         let mut iters = 100;
         while !Path::exists(&fpath) && iters > 0 {
             debug!("Waiting for {:?}", fpath);
