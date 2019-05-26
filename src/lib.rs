@@ -85,6 +85,15 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     None
 }
 
+/// Determines the target path for the slurm job file
+///
+/// The path will have the following components:
+/// - the archive path
+/// - a subdir depending on the Period
+///     - YYYY in case of a Yearly Period
+///     - YYYYMM in case of a Monthly Period
+///     - YYYYMMDD in case of a Daily Period 
+/// - a file with the given filename
 fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry, filename: &str) -> PathBuf {
     let archive_subdir = match p {
         Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
@@ -222,7 +231,6 @@ mod tests {
         assert_eq!(is_job_path(&fdir), None);
     }
 
-
     #[test]
     fn test_determine_target_path() {
 
@@ -255,7 +263,5 @@ mod tests {
         let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
 
         assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
-
-
     }
 }
