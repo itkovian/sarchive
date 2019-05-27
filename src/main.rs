@@ -54,7 +54,7 @@ fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Resul
         .level(level_filter);
 
     match logfile {
-        Some(filename) => base_config.chain(fern::log_file(filename).unwrap()),
+        Some(filename) => base_config.chain(fern::log_file("output.log").unwrap()),
         None => base_config.chain(std::io::stdout())
     }.apply()
 }
