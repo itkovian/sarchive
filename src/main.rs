@@ -151,10 +151,9 @@ fn main() {
     }
 
     // we will watch the ten hash.X directories
-    let hash_range = 0..10;
     let (sender, receiver) = unbounded();
     scope(|s| {
-        for hash in hash_range {
+        for hash in 0..10 {
             info!("Watching hash.");
             let h = hash.clone();
             let t = &sender;
