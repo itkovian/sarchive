@@ -40,10 +40,8 @@ use std::process::exit;
 mod lib;
 use lib::{monitor, process, Period};
 
-fn setup_logging(level_filter: log::LevelFilter) -> Result<(), log::SetLoggerError> {
-    let base_config = fern::Dispatch::new().level(level_filter);
-
-    let stdout_config = fern::Dispatch::new()
+fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
+    let base_config = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
                 "[{}][{}][{}] {}",
@@ -53,9 +51,12 @@ fn setup_logging(level_filter: log::LevelFilter) -> Result<(), log::SetLoggerErr
                 message
             ))
         })
-        .chain(io::stdout());
+        .level(level_filter);
 
-    base_config.chain(stdout_config).apply()
+    match logfile {
+        Some(filename) => base_config.chain(fern::log_file(filename).unwrap()),
+        None => base_config.chain(std::io::stdout())
+    }.apply()
 }
 
 fn main() {
@@ -83,13 +84,11 @@ fn main() {
                 .help("Log at DEBUG level.")
         )
         .arg(
-            Arg::with_name("spool")
-                .long("spool")
-                .short("s")
+            Arg::with_name("logfile")
+                .long("logfile")
+                .short("l")
                 .takes_value(true)
-                .help(
-                    "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
-                )
+                .help("Log file name.")
         )
         .arg(
             Arg::with_name("period")
@@ -103,6 +102,15 @@ fn main() {
                     "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
                 )
         )
+        .arg(
+            Arg::with_name("spool")
+                .long("spool")
+                .short("s")
+                .takes_value(true)
+                .help(
+                    "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
+                )
+        )
         .get_matches();
 
     let log_level = if matches.is_present("debug") {
@@ -110,7 +118,7 @@ fn main() {
     } else {
         log::LevelFilter::Info
     };
-    match setup_logging(log_level) {
+    match setup_logging(log_level, matches.value_of("logfile")) {
         Ok(_) => (),
         Err(e) => panic!("Cannot set up logging: {:?}", e)
     };
