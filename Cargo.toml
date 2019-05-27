@@ -5,6 +5,12 @@ authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2018"
 description = "Archiving tool for slurm job scripts"
 license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/itkovian/sarchive"
+repository = "https://github.com/itkovian/sarchive"
+keywords = ["slurm", "cli", "archival"]
+categories = ["command-line-utilities"]
+
 
 [dependencies]
 clap = "2.33"
