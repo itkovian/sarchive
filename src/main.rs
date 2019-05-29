@@ -33,6 +33,7 @@ extern crate syslog;
 use clap::{App, Arg};
 use crossbeam_channel::unbounded;
 use crossbeam_utils::thread::scope;
+use std::fs::create_dir_all;
 use std::io;
 use std::path::Path;
 use std::process::exit;
@@ -146,8 +147,14 @@ fn main() {
         exit(1);
     }
     if !archive.is_dir() {
-        error!("Provided archive {:?} is not a valid directory", archive);
-        exit(1);
+        warn!("Provided archive {:?} is not a valid directory, creating it.", &archive);
+        match create_dir_all(&archive) {
+            Err(e) => {
+                error!("Unable to create archive at {:?}", &archive);
+                exit(1);
+            },
+            _ => ()
+        }
     }
 
     // we will watch the ten hash.X directories
