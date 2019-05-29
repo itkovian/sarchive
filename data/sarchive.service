@@ -1,6 +1,6 @@
 [Unit]
 Description=Slurm job archival
-After=slurm.target
+After=slurmctld.service
 
 [Service]
 Type=simple
