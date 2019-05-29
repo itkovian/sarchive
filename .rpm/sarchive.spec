@@ -9,6 +9,7 @@ Release: 1
 License: MIT
 Group: Applications/System
 Source0: %{name}-%{version}.tar.gz
+URL: https://github.com/itkovian/sarchive
 
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
@@ -29,3 +30,4 @@ rm -rf %{buildroot}
 %files
 %defattr(-,root,root,-)
 %{_bindir}/*
+/usr/lib/systemd/system/sarchive.service
