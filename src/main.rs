@@ -142,6 +142,8 @@ fn main() {
             .expect("You must provide the location of the archive"),
     );
 
+    info!("sarchive starting. Watching hash dirs in {:?}. Archiving under {:?}.", &base, &archive);
+
     if !base.is_dir() {
         error!("Provided base {:?} is not a valid directory", base);
         exit(1);
@@ -161,14 +163,14 @@ fn main() {
     let (sender, receiver) = unbounded();
     scope(|s| {
         for hash in 0..10 {
-            info!("Watching hash.");
+            info!("Watching hash.{}", &hash);
             let h = hash.clone();
             let t = &sender;
             s.spawn(move |_| match monitor(base, h, t) {
-                Ok(_) => info!("Stopped watching hash"),
+                Ok(_) => info!("Stopped watching hash.{}", &h),
                 Err(e) => {
                     error!("{}", e);
-                    panic!("Error watching hash.{}", h);
+                    panic!("Error watching hash.{}", &h);
                 }
             });
         }
