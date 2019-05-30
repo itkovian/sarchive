@@ -23,24 +23,41 @@ extern crate chrono;
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
-extern crate notify;
-
+extern crate fern;
+extern crate libc;
 #[macro_use]
 extern crate log;
-extern crate fern;
+extern crate notify;
+extern crate reopen;
 extern crate syslog;
 
 use clap::{App, Arg};
 use crossbeam_channel::unbounded;
 use crossbeam_utils::thread::scope;
+use reopen::Reopen;
+use std::fs::{File, OpenOptions};
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::process::exit;
+use fern::{Output, OutputInner};
 
 mod lib;
 use lib::{monitor, process, Period};
 
-fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
+impl From<Reopen<File>> for Output {
+    /// Creates an output logger which writes all messages to the file with
+    /// `\n` as the separator.
+    ///
+    /// File writes are buffered and flushed once per log record.
+    fn from(file: Reopen<File>) -> Self {
+        Output(OutputInner::File {
+            stream: file,
+            line_sep: "\n".into(),
+        })
+    }
+}
+
+fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&'static str>) -> Result<(), log::SetLoggerError> {
     let base_config = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -54,7 +71,19 @@ fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Resul
         .level(level_filter);
 
     match logfile {
-        Some(filename) => base_config.chain(fern::log_file(filename).unwrap()),
+        Some(filename) => {
+            let filename_ = filename.clone();
+            let f = move || 
+                OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .append(true)
+                    .open(filename_);
+                //fern::log_file(&filename)
+            
+            let file = Reopen::new(Box::new(&f));
+            base_config.chain(fern::log_file(&filename).unwrap())
+        },
         None => base_config.chain(std::io::stdout())
     }.apply()
 }
