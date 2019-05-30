@@ -34,7 +34,6 @@ use clap::{App, Arg};
 use crossbeam_channel::unbounded;
 use crossbeam_utils::thread::scope;
 use std::fs::create_dir_all;
-use std::io;
 use std::path::Path;
 use std::process::exit;
 
@@ -150,23 +149,19 @@ fn main() {
     }
     if !archive.is_dir() {
         warn!("Provided archive {:?} is not a valid directory, creating it.", &archive);
-        match create_dir_all(&archive) {
-            Err(e) => {
-                error!("Unable to create archive at {:?}", &archive);
-                exit(1);
-            },
-            _ => ()
+        if let Err(e) = create_dir_all(&archive) {
+            error!("Unable to create archive at {:?}. {}", &archive, e);
+            exit(1);
         }
     }
 
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
-    scope(|s| {
+    if let Err(e) = scope(|s| {
         for hash in 0..10 {
-            info!("Watching hash.{}", &hash);
-            let h = hash.clone();
             let t = &sender;
-            s.spawn(move |_| match monitor(base, h, t) {
+            let h = hash;
+            s.spawn(move |_| match monitor(base, hash, t) {
                 Ok(_) => info!("Stopped watching hash.{}", &h),
                 Err(e) => {
                     error!("{}", e);
@@ -176,7 +171,10 @@ fn main() {
         }
         let r = &receiver;
         s.spawn(move |_| process(archive, period, r));
-    });
+    }) {
+        error!("sarchive stopping due to error: {:?}", e);
+        exit(1);
+    };
 
     info!("Sarchive finished");
     exit(0);
