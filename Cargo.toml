@@ -22,10 +22,12 @@ notify = "^4.0.11"
 libc = "^0.2.4"
 log = "^0.4.6"
 rayon = "^1.0.3"
-fern = "0.5.8"
+#fern = "0.5.8"
 syslog = "4.0.1" 
 chrono = "0.4.6"
-reopen = "^0.2.2"
+reopen = "^0.3.0"
+
+fern = { path = "/Volumes/hpcugent/hpc/repos/external/fern/" }
 
 [dev-dependencies]
 tempfile = "3.0.7"

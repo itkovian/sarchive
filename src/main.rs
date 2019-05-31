@@ -39,25 +39,21 @@ use std::fs::{File, OpenOptions};
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::process::exit;
-use fern::{Output, OutputInner};
 
 mod lib;
 use lib::{monitor, process, Period};
 
-impl From<Reopen<File>> for Output {
-    /// Creates an output logger which writes all messages to the file with
-    /// `\n` as the separator.
-    ///
-    /// File writes are buffered and flushed once per log record.
-    fn from(file: Reopen<File>) -> Self {
-        Output(OutputInner::File {
-            stream: file,
-            line_sep: "\n".into(),
-        })
-    }
+#[inline]
+fn my_open<P: AsRef<Path>>(filename: P) -> Result<File, std::io::Error> {
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(true)
+        .open(filename)
 }
 
-fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&'static str>) -> Result<(), log::SetLoggerError> {
+
+fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
     let base_config = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -72,18 +68,11 @@ fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&'static str>) 
 
     match logfile {
         Some(filename) => {
-            let filename_ = filename.clone();
-            let f = move || 
-                OpenOptions::new()
-                    .create(true)
-                    .write(true)
-                    .append(true)
-                    .open(filename_);
-                //fern::log_file(&filename)
-            
-            let file = Reopen::new(Box::new(&f));
-            base_config.chain(fern::log_file(&filename).unwrap())
-        },
+            let f = filename.to_string();
+            let r = Reopen::new(Box::new(move || my_open(&f))).unwrap();
+            r.handle().register_signal(libc::SIGHUP).unwrap();
+            base_config.chain(r)
+        }, 
         None => base_config.chain(std::io::stdout())
     }.apply()
 }
