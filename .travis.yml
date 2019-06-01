@@ -19,4 +19,7 @@ matrix:
   - rust: stable
     os: linux
     if: NOT type = pull_request
-    script: cargo test
+    # script: cargo test
+    script: | # cargo tarpaulin
+      bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh) &&
+      cargo tarpaulin --all-features --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
