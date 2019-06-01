@@ -119,7 +119,7 @@ fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &Slur
 fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
     // We wait for each file to be present
     let ten_millis = Duration::from_millis(10);
-    for filename in vec!["script", "environment"] {
+    for filename in &["script", "environment"] {
         let fpath = slurm_job_entry.path.join(filename);
         let mut iters = 100;
         while !Path::exists(&fpath) && iters > 0 {
@@ -178,11 +178,9 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Resu
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
     let path = base.join(format!("hash.{}", hash));
 
-    // TODO: check the path exists!
-    match watcher.watch(&path, RecursiveMode::NonRecursive) {
-        Err(e) => return Err(e),
-        _ => ()
-    }
+    info!("Watching path {:?}", &path);
+
+    if let Err(e) = watcher.watch(&path, RecursiveMode::NonRecursive) { return Err(e); } 
     loop {
         match rx.recv() {
             Ok(event) => check_and_queue(s, event)?,
@@ -202,10 +200,10 @@ pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>) {
             Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
             Err(_) => {
                 error!("Error on receiving SlurmJobEntry info");
-                Ok(())
+                break;
             }
         };
-    }
+    };
 }
 
 #[cfg(test)]
