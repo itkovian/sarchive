@@ -27,7 +27,7 @@ syslog = "4.0.1"
 chrono = "0.4.6"
 reopen = "^0.3.0"
 
-fern = { path = "/Volumes/hpcugent/hpc/repos/external/fern/", features = ["re-open"] }
+fern = { path = "./fern/", features = ["re-open"] }
 
 [dev-dependencies]
 tempfile = "3.0.7"
