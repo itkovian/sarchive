@@ -1,6 +1,13 @@
 language: rust
-
+sudo: false
 cache: cargo
+
+rust:
+- stable
+- beta
+- nightly
+os: 
+- linux
 
 branches:
   only:
@@ -14,21 +21,12 @@ matrix:
 
   - rust: 1.34.2
     os: linux
-    #if: everything!
     script: |
-      git clone git@github.com:itkovian/fern.git
-      cd fern
-      git checkout reopen
-      cd ..
-      cargo test
+      cargo build --verbose
   - rust: stable
     os: linux
-    if: NOT type = pull_request
-    # script: cargo test
     script: | # cargo tarpaulin
-      git clone git@github.com:itkovian/fern.git
-      cd fern
-      git checkout reopen
-      cd ..
       bash <(curl https://raw.githubusercontent.com/xd009642/tarpaulin/master/travis-install.sh) &&
       cargo tarpaulin --all-features --ciserver travis-ci --coveralls $TRAVIS_JOB_ID
+script:
+- cargo test --verbose
