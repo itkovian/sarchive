@@ -11,6 +11,9 @@ repository = "https://github.com/itkovian/sarchive"
 keywords = ["slurm", "cli", "archival", "hpc"]
 categories = ["command-line-utilities"]
 
+[badges]
+travis-ci = { repository = "itkovian/sarchive" }
+coveralls = { repository = "itkovian/sarchive" }
 
 [dependencies]
 clap = "2.33"
