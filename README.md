@@ -13,23 +13,24 @@ Archival tool for Slurm job scripts and accompanying environments.
 `1.34.2+`
 
 This version is what we test against in CI. We also test on 
-    - stable
-    - beta
-    - nightly
-for both Linux and MaxOS.:w
+  - stable
+  - beta
+  - nightly
+
+for both Linux and MaxOS.
 
 
 ## Usage
 
 `sarchive` requires that two paths are provided:
-    - The Slurm spool directory where the `hash.[0-9]` directories can be found
-    - The archive directory, where the copied scripts and environments will be 
-      stored. This directory is created, if it does not exist.
+  - The Slurm spool directory where the `hash.[0-9]` directories can be found
+  - The archive directory, where the copied scripts and environments will be 
+    stored. This directory is created, if it does not exist.
 
 The archive can be further divided into subdirectories per
-    - year: YYYY, by provinging `--period=yearly`
-    - month: YYYYMM, by providing `--period=montly`
-    - day: YYYYMMDD, by providing `--period=daily`
+  - year: YYYY, by provinging `--period=yearly`
+  - month: YYYYMM, by providing `--period=montly`
+  - day: YYYYMMDD, by providing `--period=daily`
 This allows for easily tarring old(er) directories you still wish to keep around, 
 but probably no longer immediately need for user support.
 
