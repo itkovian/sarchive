@@ -12,7 +12,12 @@ Archival tool for Slurm job scripts and accompanying environments.
 
 `1.34.2+`
 
-This version is what we test against in CI.
+This version is what we test against in CI. We also test on 
+    - stable
+    - beta
+    - nightly
+for both Linux and MaxOS.:w
+
 
 ## Usage
 
