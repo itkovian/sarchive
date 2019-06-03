@@ -16,21 +16,19 @@ travis-ci = { repository = "itkovian/sarchive" }
 coveralls = { repository = "itkovian/sarchive" }
 
 [dependencies]
+chrono = "0.4.6"
 clap = "2.33"
 crossbeam = "0.7.1"
 crossbeam-channel = "0.3.7"
 crossbeam-queue = "0.1.2"
 crossbeam-utils = "0.6.5"
-notify = "^4.0.11"
+fern = { features = ["reopen-03"] }
 libc = "^0.2.4"
 log = "^0.4.6"
-rayon = "^1.0.3"
-#fern = "0.5.8"
-syslog = "4.0.1" 
-chrono = "0.4.6"
+notify = "^4.0.11"
 reopen = "^0.3.0"
-
-fern = { path = "./fern/", features = ["re-open"] }
+rayon = "^1.0.3"
+syslog = "4.0.1" 
 
 [dev-dependencies]
 tempfile = "3.0.7"
