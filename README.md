@@ -4,6 +4,7 @@ SArchive
 [![Build Status](https://travis-ci.org/itkovian/sarchive.svg?branch=master)](https://travis-ci.org/itkovian/sarchive)
 [![Coverage Status](https://coveralls.io/repos/github/itkovian/sarchive/badge.svg)](https://coveralls.io/github/itkovian/sarchive)
 
+[![crates.io](https://img.shields.io/crates/v/sarchive.svg)](https://crates.io/crates/sarchive)
 Archival tool for Slurm job scripts and accompanying environments.
 
 ## Minimum supported `rustc`
