@@ -18,11 +18,22 @@ This version is what we test against in CI.
 
 `sarchive` requires that two paths are provided:
     - The Slurm spool directory where the `hash.[0-9]` directories can be found
-    - The archive directory, which should exist and be accesible to the user running sarchive.
+    - The archive directory, where the copied scripts and environments will be 
+      stored. This directory is created, if it does not exist.
+
+The archive can be further divided into subdirectories per
+    - year: YYYY, by provinging `--period=yearly`
+    - month: YYYYMM, by providing `--period=montly`
+    - day: YYYYMMDD, by providing `--period=daily`
+This allows for easily tarring old(er) directories you still wish to keep around, 
+but probably no longer immediately need for user support.
 
 `sarchive -s /var/spool/slurm -a /var/backups/slurm/job-archive`
 
 ## RPMs
 
-We provide a build script to generate an RPM using the cargo-rpm tool. You should tailor the spec file (under `.rpm`) to your needs.
+We provide a build script to generate an RPM using the cargo-rpm tool. You may tailor the spec 
+file (listed under the `.rpm` directory) to fit your needs. The RPM includes a unit file so
+`sarchive` can be started as a service by systemd. This file should also be changed to fit your
+requirements and local configuration.
 
