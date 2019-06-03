@@ -116,6 +116,13 @@ fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &Slur
 }
 
 /// Archives the files from the given SlurmJobEntry's path.
+/// 
+/// We busy wait for 1 second, sleeping for 10 ms per turn for
+/// the environment and script files to appear.
+/// If the files cannot be found after that tine, we output a warning
+/// and return without copying. 
+/// If the directory dissapears before we found or copied the files, 
+/// we panic.
 fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
     // We wait for each file to be present
     let ten_millis = Duration::from_millis(10);
@@ -212,7 +219,8 @@ mod tests {
     extern crate tempfile;
 
     use super::*;
-    use std::fs::{create_dir};
+    use std::fs::{create_dir, read_to_string, File};
+    use std::io::Write;
     use std::path::Path;
     use tempfile::{tempdir};
 
@@ -263,5 +271,42 @@ mod tests {
         let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
 
         assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
+    }
+
+    #[test]
+    fn test_archive() {
+
+        let tdir = tempdir().unwrap();
+
+        // create the basic archive path
+        let archive_dir = tdir.path().join("archive");
+        let _dir = create_dir(&archive_dir);
+
+        // create the basic job path
+        let job_dir = tdir.path().join("job.1234");
+        let _dir = create_dir(&job_dir);
+
+        // create env and script files
+        let env_path = job_dir.join("environment");
+        let mut env = File::create(env_path).unwrap();
+        env.write(b"environment");
+
+        let job_path = job_dir.join("script");
+        let mut job = File::create(&job_path).unwrap();
+        job.write(b"job script");
+
+
+        let slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234");
+
+        archive(&archive_dir, &Period::None, &slurm_job_entry);
+
+        assert!(Path::is_file(&archive_dir.join("job.1234_environment")));
+        assert!(Path::is_file(&archive_dir.join("job.1234_script")));
+
+        let archive_env_contents = read_to_string(&archive_dir.join("job.1234_environment")).unwrap();
+        assert_eq!(&archive_env_contents, "environment");
+
+        let archive_script_contents = read_to_string(&archive_dir.join("job.1234_script")).unwrap();
+        assert_eq!(&archive_script_contents, "job script");
     }
 }
