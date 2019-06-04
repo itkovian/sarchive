@@ -38,7 +38,10 @@ use std::path::Path;
 use std::process::exit;
 
 mod lib;
-use lib::{monitor, process, Period, Slurm, Scheduler};
+mod slurm;
+
+use lib::{monitor, process, Period};
+use slurm::Slurm;
 
 
 fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
