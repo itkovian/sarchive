@@ -24,6 +24,7 @@ extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 
 use crossbeam_channel::{Receiver, Sender};
+use crossbeam::thread::{scope, Scope};
 use log::*;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
@@ -32,6 +33,55 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::thread::sleep;
 use std::time::Duration;
+use std::marker::Send;
+
+/// Trait to represent a scheduler item that needs to be archivable
+pub trait Scheduler: Send {
+    /// Checks that the path is valid for the job item that needs to 
+    /// be archived.
+    fn valid_path(&self, path: &Path) -> Option<Box<SchedulerJob>>;
+    //fn monitor(&self, base: &Path, archive: &Path, p: Period, s: &Sender<Box<SchedulerJob>>, r: &Receiver<Box<SchedulerJob>>) -> notify::Result<()>;
+    //fn monitor_path(&self, path: &Path, s: &Sender<Box<SchedulerJob>>) -> notify::Result<()>;
+}
+
+pub trait SchedulerJob: Send {
+    fn archive(&self, archive_path: &Path, period: &Period) -> Result<(), std::io::Error>;
+}
+
+
+pub struct Slurm;
+
+
+impl Scheduler for Slurm {
+
+    /// Verifies that the path metioned in the event is a that of a file that
+    /// needs archival
+    ///
+    /// This ignores the path prefix, but verifies that
+    /// - the path points to a file
+    /// - there is a path dir component that starts with "job."
+    ///
+    /// For example, /var/spool/slurm/hash.3/job.01234./script is a valid path
+    ///
+    /// We return a tuple of two strings: the job ID and the filename, wrapped in
+    /// an Option.
+    fn valid_path(&self, path: &Path) -> Option<Box<SchedulerJob>> {
+        if path.is_dir() {
+            let dirname = path.file_name().unwrap().to_str().unwrap();
+            if dirname.starts_with("job.") {
+                return Some(
+                    Box::new(SlurmJobEntry::new(
+                        &path.to_owned(), 
+                        path.extension().unwrap().to_str().unwrap()
+                    ))
+                );
+            }
+        }
+        debug!("{:?} is not a considered job path", &path);
+        None
+    }
+}
+
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
@@ -47,6 +97,57 @@ impl SlurmJobEntry {
             path: p.clone(),
             jobid: id.to_string(),
         }
+    }
+}
+
+impl SchedulerJob for SlurmJobEntry {
+
+    /// Archives the files from the given SlurmJobEntry's path.
+    /// 
+    /// We busy wait for 1 second, sleeping for 10 ms per turn for
+    /// the environment and script files to appear.
+    /// If the files cannot be found after that tine, we output a warning
+    /// and return without copying. 
+    /// If the directory dissapears before we found or copied the files, 
+    /// we panic.
+    fn archive(&self, archive_path: &Path, p: &Period) -> Result<(), Error> {
+        // We wait for each file to be present
+        let ten_millis = Duration::from_millis(10);
+        for filename in &["script", "environment"] {
+            let fpath = self.path.join(filename);
+            let mut iters = 100;
+            while !Path::exists(&fpath) && iters > 0 {
+                debug!("Waiting for {:?}", fpath);
+                sleep(ten_millis);
+                if !Path::exists(&self.path) {
+                    error!("Job directory {:?} no longer exists", &self.path);
+                    panic!("path not found");
+                }
+                iters -= 1;
+            }
+            if iters == 0 {
+                warn!("Cannot make copy of {:?}", fpath);
+                continue;
+            }
+
+            let target_path =  determine_target_path(&archive_path, &p, &self.jobid, &filename);
+            
+            match copy(&fpath, &target_path) {
+                Ok(bytes) => info!(
+                    "copied {} bytes from {:?} to {:?}",
+                    bytes, &fpath, &target_path
+                ),
+                Err(e) => {
+                    error!(
+                        "Copy of {:?} to {:?} failed: {:?}",
+                        &fpath, &target_path, e
+                    );
+                    return Err(e);
+                }
+            };
+        }
+
+        Ok(())
     }
 }
 
@@ -94,7 +195,7 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
 ///     - YYYYMM in case of a Monthly Period
 ///     - YYYYMMDD in case of a Daily Period 
 /// - a file with the given filename
-fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry, filename: &str) -> PathBuf {
+fn determine_target_path(archive_path: &Path, p: &Period, job_id: &str, filename: &str) -> PathBuf {
     let archive_subdir = match p {
         Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
         Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%m"))),
@@ -109,67 +210,20 @@ fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &Slur
                 debug!("Archive subdir {:?} does not yet exist, creating", &d);
                 create_dir_all(&archive_subdir_path).unwrap();
             }
-            archive_subdir_path.clone().join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+            archive_subdir_path.clone().join(format!("job.{}_{}", job_id, &filename))
         },
-        None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+        None => archive_path.join(format!("job.{}_{}", job_id, &filename))
     }
 }
 
-/// Archives the files from the given SlurmJobEntry's path.
-/// 
-/// We busy wait for 1 second, sleeping for 10 ms per turn for
-/// the environment and script files to appear.
-/// If the files cannot be found after that tine, we output a warning
-/// and return without copying. 
-/// If the directory dissapears before we found or copied the files, 
-/// we panic.
-fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
-    // We wait for each file to be present
-    let ten_millis = Duration::from_millis(10);
-    for filename in &["script", "environment"] {
-        let fpath = slurm_job_entry.path.join(filename);
-        let mut iters = 100;
-        while !Path::exists(&fpath) && iters > 0 {
-            debug!("Waiting for {:?}", fpath);
-            sleep(ten_millis);
-            if !Path::exists(&slurm_job_entry.path) {
-                error!("Job directory {:?} no longer exists", &slurm_job_entry.path);
-                panic!("path not found");
-            }
-            iters -= 1;
-        }
-        if iters == 0 {
-            warn!("Cannot make copy of {:?}", fpath);
-            continue;
-        }
-
-        let target_path =  determine_target_path(&archive_path, &p, &slurm_job_entry, &filename);
-        
-        match copy(&fpath, &target_path) {
-            Ok(bytes) => info!(
-                "copied {} bytes from {:?} to {:?}",
-                bytes, &fpath, &target_path
-            ),
-            Err(e) => {
-                error!(
-                    "Copy of {:?} to {:?} failed: {:?}",
-                    &slurm_job_entry.path, &target_path, e
-                );
-                return Err(e);
-            }
-        };
-    }
-
-    Ok(())
-}
-
-fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
-    debug!("Event received: {:?}", event);
+fn check_and_queue(scheduler: &Scheduler, s: &Sender<Box<SchedulerJob>>, event: DebouncedEvent) -> Result<(), Error> {
+    debug!("Event received {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-            if let Some((jobid, _dirname)) = is_job_path(&path) {
-                let e = SlurmJobEntry::new(&path, jobid);
-                s.send(e).unwrap();
+            debug!("Handling event");
+            if let Some(job_entry) = scheduler.valid_path(&path) {
+                debug!("Queueing");
+                s.send(job_entry).unwrap();
             };
         }
         // We ignore all other events
@@ -178,33 +232,30 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(
     Ok(())
 }
 
-pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Result<()> {
+pub fn monitor(scheduler: &Scheduler, path: &Path, s: &Sender<Box<SchedulerJob>>) -> notify::Result<()> {
     let (tx, rx) = channel();
 
     // create a platform-specific watcher
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
-    let path = base.join(format!("hash.{}", hash));
-
     info!("Watching path {:?}", &path);
 
     if let Err(e) = watcher.watch(&path, RecursiveMode::NonRecursive) { return Err(e); } 
     loop {
         match rx.recv() {
-            Ok(event) => check_and_queue(s, event)?,
+            Ok(event) => check_and_queue(scheduler, s, event)?,
             Err(e) => {
                 error!("Error on received event: {:?}", e);
                 break;
             }
         };
     }
-
     Ok(())
 }
 
-pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>) {
+pub fn process(archive_path: &Path, p: Period, r: &Receiver<Box<SchedulerJob>>) {
     loop {
         match r.recv() {
-            Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
+            Ok(job_entry) => job_entry.archive(&archive_path, &p),
             Err(_) => {
                 error!("Error on receiving SlurmJobEntry info");
                 break;

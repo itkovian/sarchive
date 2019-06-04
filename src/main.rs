@@ -38,7 +38,8 @@ use std::path::Path;
 use std::process::exit;
 
 mod lib;
-use lib::{monitor, process, Period};
+use lib::{monitor, process, Period, Slurm, Scheduler};
+
 
 fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
     let base_config = fern::Dispatch::new()
@@ -61,9 +62,9 @@ fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Resul
 
 fn main() {
     let matches = App::new("SArchive")
-        .version("0.1.0")
+        .version("0.6.0")
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
-        .about("Archive slurm user job scripts.")
+        .about("Archive user job scripts for Slurm and Torque.")
         .arg(
             Arg::with_name("archive")
                 .long("archive")
@@ -100,6 +101,17 @@ fn main() {
                 .possible_value("daily")
                 .help(
                     "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
+                )
+        )
+        .arg(
+            Arg::with_name("scheduler")
+                .long("scheduler")
+                .takes_value(true)
+                .possible_value("slurm")
+                .possible_value("torque")
+                .default_value("slurm")
+                .help(
+                    "For which scheduler configuration should we archive: slurm, torque."
                 )
         )
         .arg(
@@ -141,6 +153,12 @@ fn main() {
             .expect("You must provide the location of the archive"),
     );
 
+    let scheduler = match matches.value_of("scheduler") {
+        Some("slurm") => Slurm,
+        Some("torque") => Slurm,
+        _ => Slurm
+    };
+
     info!("sarchive starting. Watching hash dirs in {:?}. Archiving under {:?}.", &base, &archive);
 
     if !base.is_dir() {
@@ -155,27 +173,27 @@ fn main() {
         }
     }
 
-    // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
-    if let Err(e) = scope(|s| {
+    if let Err(_) = scope(|s| {
         for hash in 0..10 {
+            let sh = &scheduler;
             let t = &sender;
+            let p = base.join(format!("hash.{}", hash)).to_owned();
             let h = hash;
-            s.spawn(move |_| match monitor(base, hash, t) {
+            s.spawn(move |_| { match monitor(sh, &p, t) {
                 Ok(_) => info!("Stopped watching hash.{}", &h),
                 Err(e) => {
                     error!("{}", e);
                     panic!("Error watching hash.{}", &h);
                 }
-            });
+            }});
         }
         let r = &receiver;
         s.spawn(move |_| process(archive, period, r));
     }) {
-        error!("sarchive stopping due to error: {:?}", e);
-        exit(1);
-    };
-
+        debug!("Whoops, spaswned thread went haywire");
+        exit(-1);
+    }
     info!("Sarchive finished");
     exit(0);
 }
