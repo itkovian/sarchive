@@ -138,6 +138,11 @@ pub fn process(archive_path: &Path, p: Period, r: &Receiver<Box<SchedulerJob>>) 
 
 #[cfg(test)]
 mod tests {
+
+    use super::*;
+    use std::fs::{create_dir};
+    use tempfile::{tempdir};
+
     #[test]
     fn test_determine_target_path() {
 
@@ -146,28 +151,28 @@ mod tests {
         // create the basic archive path
         let archive_dir = tdir.path();
         let _dir = create_dir(&archive_dir);
-        let slurm_job_entry = SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
+        let job_id = "1234";
 
         let p = Period::None;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
+        let target_path = determine_target_path(&archive_dir, &p, &job_id, "foobar");
 
         assert_eq!(target_path, archive_dir.join(format!("job.1234_foobar")));
 
         let d = format!("{}", chrono::Local::now().format("%Y"));
         let p = Period::Yearly;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
+        let target_path = determine_target_path(&archive_dir, &p, &job_id, "foobar");
 
         assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
 
         let d = format!("{}", chrono::Local::now().format("%Y%m"));
         let p = Period::Monthly;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
+        let target_path = determine_target_path(&archive_dir, &p, &job_id, "foobar");
 
         assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
 
         let d = format!("{}", chrono::Local::now().format("%Y%m%d"));
         let p = Period::Daily;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
+        let target_path = determine_target_path(&archive_dir, &p, &job_id, "foobar");
 
         assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
     }

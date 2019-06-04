@@ -64,8 +64,9 @@ impl Scheduler for Slurm {
 
 
 /// Representation of an entry in the Slurm job spool hash directories
+#[derive(Debug)]
 pub struct SlurmJobEntry {
-    /// The full path to the file that needs to be archived
+    /// The full path to the directory with the files that need to be archived
     path: PathBuf,
     /// The job ID
     jobid: String,
@@ -144,57 +145,22 @@ mod tests {
     use tempfile::{tempdir};
 
     #[test]
-    fn test_is_job_path() {
+    fn test_valid_path() {
         let tdir = tempdir().unwrap();
+        let slurm = Slurm;
 
         // this should pass
         let jobdir = tdir.path().join("job.1234");
         let _dir = create_dir(&jobdir);
-        assert_eq!(is_job_path(&jobdir), Some(("1234", "job.1234")));
-
+        let vp = slurm.valid_path(&jobdir);
         // this should fail
         let fdir = tdir.path().join("fubar");
         let _faildir = create_dir(&fdir);
-        assert_eq!(is_job_path(&fdir), None);
-    }
-
-    #[test]
-    fn test_determine_target_path() {
-
-        let tdir = tempdir().unwrap();
-
-        // create the basic archive path
-        let archive_dir = tdir.path();
-        let _dir = create_dir(&archive_dir);
-        let slurm_job_entry = SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
-
-        let p = Period::None;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
-
-        assert_eq!(target_path, archive_dir.join(format!("job.1234_foobar")));
-
-        let d = format!("{}", chrono::Local::now().format("%Y"));
-        let p = Period::Yearly;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
-
-        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
-
-        let d = format!("{}", chrono::Local::now().format("%Y%m"));
-        let p = Period::Monthly;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
-
-        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
-
-        let d = format!("{}", chrono::Local::now().format("%Y%m%d"));
-        let p = Period::Daily;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
-
-        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
+        let vp = slurm.valid_path(&fdir);
     }
 
     #[test]
     fn test_archive() {
-
         let tdir = tempdir().unwrap();
 
         // create the basic archive path
@@ -217,7 +183,7 @@ mod tests {
 
         let slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234");
 
-        archive(&archive_dir, &Period::None, &slurm_job_entry);
+        slurm_job_entry.archive(&archive_dir, &Period::None);
 
         assert!(Path::is_file(&archive_dir.join("job.1234_environment")));
         assert!(Path::is_file(&archive_dir.join("job.1234_script")));
