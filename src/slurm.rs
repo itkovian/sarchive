@@ -20,6 +20,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+use clap::ArgMatches;
+use crossbeam_channel::unbounded;
+use crossbeam_utils::thread::scope;
 use log::*;
 use std::fs::copy;
 use std::io::Error;
@@ -27,7 +30,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::thread::sleep;
 
-use super::lib::{Period, Scheduler, SchedulerJob, determine_target_path};
+use super::lib::{Period, Scheduler, SchedulerJob, determine_target_path, monitor_path, process};
 
 pub struct Slurm;
 
@@ -60,11 +63,33 @@ impl Scheduler for Slurm {
         debug!("{:?} is not a considered job path", &path);
         None
     }
+
+    fn start_monitor(&self, base: &Path, archive: &Path, period: Period, options: Option<&ArgMatches>) {
+        let (sender, receiver) = unbounded();
+        if let Err(_) = scope(|s| {
+            for hash in 0..10 {
+                let sh = self;
+                let t = &sender;
+                let p = base.join(format!("hash.{}", hash)).to_owned();
+                let h = hash;
+                s.spawn(move |_| { match monitor_path(sh, &p, t) {
+                    Ok(_) => info!("Stopped watching hash.{}", &h),
+                    Err(e) => {
+                        error!("{}", e);
+                        panic!("Error watching hash.{}", &h);
+                    }
+                }});
+            }
+            let r = &receiver;
+            s.spawn(move |_| process(archive, period, r));
+        }) {
+            debug!("Whoops, spaswned thread went haywire");
+        }
+    }
 }
 
 
 /// Representation of an entry in the Slurm job spool hash directories
-#[derive(Debug)]
 pub struct SlurmJobEntry {
     /// The full path to the directory with the files that need to be archived
     path: PathBuf,

@@ -30,18 +30,18 @@ extern crate log;
 extern crate fern;
 extern crate syslog;
 
-use clap::{App, Arg};
-use crossbeam_channel::unbounded;
-use crossbeam_utils::thread::scope;
+use clap::{App, Arg, SubCommand};
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::process::exit;
 
 mod lib;
 mod slurm;
+mod torque;
 
-use lib::{monitor, process, Period};
+use lib::{Period, Scheduler};
 use slurm::Slurm;
+use torque::Torque;
 
 
 fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
@@ -107,17 +107,6 @@ fn main() {
                 )
         )
         .arg(
-            Arg::with_name("scheduler")
-                .long("scheduler")
-                .takes_value(true)
-                .possible_value("slurm")
-                .possible_value("torque")
-                .default_value("slurm")
-                .help(
-                    "For which scheduler configuration should we archive: slurm, torque."
-                )
-        )
-        .arg(
             Arg::with_name("spool")
                 .long("spool")
                 .short("s")
@@ -125,6 +114,14 @@ fn main() {
                 .help(
                     "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
                 )
+        )
+        .subcommand(SubCommand::with_name("slurm"))
+        .subcommand(SubCommand::with_name("torque")
+            .about("Torque monitor options")
+            .arg(Arg::with_name("subdirs")
+                .long("subdirs")
+                .help("Monitor the job subdirectories in the server_priv job spool")
+            )
         )
         .get_matches();
 
@@ -156,12 +153,6 @@ fn main() {
             .expect("You must provide the location of the archive"),
     );
 
-    let scheduler = match matches.value_of("scheduler") {
-        Some("slurm") => Slurm,
-        Some("torque") => Slurm,
-        _ => Slurm
-    };
-
     info!("sarchive starting. Watching hash dirs in {:?}. Archiving under {:?}.", &base, &archive);
 
     if !base.is_dir() {
@@ -176,27 +167,15 @@ fn main() {
         }
     }
 
-    let (sender, receiver) = unbounded();
-    if let Err(_) = scope(|s| {
-        for hash in 0..10 {
-            let sh = &scheduler;
-            let t = &sender;
-            let p = base.join(format!("hash.{}", hash)).to_owned();
-            let h = hash;
-            s.spawn(move |_| { match monitor(sh, &p, t) {
-                Ok(_) => info!("Stopped watching hash.{}", &h),
-                Err(e) => {
-                    error!("{}", e);
-                    panic!("Error watching hash.{}", &h);
-                }
-            }});
-        }
-        let r = &receiver;
-        s.spawn(move |_| process(archive, period, r));
-    }) {
-        debug!("Whoops, spaswned thread went haywire");
-        exit(-1);
-    }
+    if let Some(_) = matches.subcommand_matches("slurm") {
+        let scheduler = Slurm;
+        scheduler.start_monitor(&base, &archive, period, None);
+    } else if let Some(scheduler_options) = matches.subcommand_matches("torque") {
+        let scheduler = Torque;
+        scheduler.start_monitor(&base, &archive, period, Some(scheduler_options));
+    };
+        
+ 
     info!("Sarchive finished");
     exit(0);
 }

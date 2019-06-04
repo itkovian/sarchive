@@ -23,6 +23,7 @@ extern crate chrono;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 
+use clap::ArgMatches;
 use crossbeam_channel::{Receiver, Sender};
 use log::*;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
@@ -39,6 +40,7 @@ pub trait Scheduler: Send {
     /// Checks that the path is valid for the job item that needs to 
     /// be archived.
     fn valid_path(&self, path: &Path) -> Option<Box<SchedulerJob>>;
+    fn start_monitor(&self, base: &Path, archive: &Path, period: Period, options: Option<&ArgMatches>);
 }
 
 
@@ -104,7 +106,7 @@ fn check_and_queue(scheduler: &Scheduler, s: &Sender<Box<SchedulerJob>>, event: 
     Ok(())
 }
 
-pub fn monitor(scheduler: &Scheduler, path: &Path, s: &Sender<Box<SchedulerJob>>) -> notify::Result<()> {
+pub fn monitor_path(scheduler: &Scheduler, path: &Path, s: &Sender<Box<SchedulerJob>>) -> notify::Result<()> {
     let (tx, rx) = channel();
 
     // create a platform-specific watcher

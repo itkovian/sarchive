@@ -20,6 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+use clap::ArgMatches;
 use log::*;
 use std::fs::copy;
 use std::io::Error;
@@ -33,16 +34,24 @@ pub struct Torque;
 
 impl Scheduler for Torque {
 
+    fn valid_path(&self, path: &Path) -> Option<Box<SchedulerJob>> {
+        None
+    }
 
-
+    fn start_monitor(&self, base: &Path, archive: &Path, period: Period, options: Option<&ArgMatches>) {
+    }
 }
+
 
 struct TorqueJobEntry {
 
 
 }
 
-imple SchedulerJob for TorqueJobEntry {
+impl SchedulerJob for TorqueJobEntry {
 
+    fn archive(&self, archive_path: &Path, p: &Period) -> Result<(), Error> {
+        Ok(())
+    }
 
 }
