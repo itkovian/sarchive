@@ -34,18 +34,21 @@ use std::thread::sleep;
 use std::time::Duration;
 
 /// Representation of an entry in the Slurm job spool hash directories
-pub struct SlurmJobEntry {
+pub struct TorqueJobEntry    {
     /// The full path to the file that needs to be archived
     path: PathBuf,
     /// The job ID
     jobid: String,
+    /// The file type
+    file_type: String,
 }
 
-impl SlurmJobEntry {
-    fn new(p: &PathBuf, id: &str) -> SlurmJobEntry {
-        SlurmJobEntry {
+impl TorqueJobEntry {
+    fn new(p: &PathBuf, id: &str, t: &str) -> TorqueJobEntry {
+        TorqueJobEntry {
             path: p.clone(),
-            jobid: id.to_string(),
+            jobid: id.to_owned(),
+            file_type: t.to_owned(),
         }
     }
 }
@@ -73,13 +76,12 @@ pub enum Period {
 ///
 /// We return a tuple of two strings: the job ID and the filename, wrapped in
 /// an Option.
-fn is_job_path(path: &Path) -> Option<(&str, &str)> {
-    if path.is_dir() {
-        let dirname = path.file_name().unwrap().to_str().unwrap();
-
-        if dirname.starts_with("job.") {
-            return Some((path.extension().unwrap().to_str().unwrap(), dirname));
-        };
+fn is_job_path(path: &Path) -> Option<(&str, &Path, String)> {
+    if path.is_file() {
+        let jobfile_path = path.file_name().unwrap();
+        let jobid = path.file_stem().unwrap().to_str().unwrap();
+        let file_type = path.extension().unwrap().to_str().unwrap();
+        return Some((jobid, path, file_type.to_string()));
     }
     debug!("{:?} is not a considered job path", &path);
     None
@@ -94,7 +96,7 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
 ///     - YYYYMM in case of a Monthly Period
 ///     - YYYYMMDD in case of a Daily Period 
 /// - a file with the given filename
-fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry, filename: &str) -> PathBuf {
+fn determine_target_path(archive_path: &Path, p: &Period, job_entry: &TorqueJobEntry, filename: &str) -> PathBuf {
     let archive_subdir = match p {
         Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
         Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%m"))),
@@ -109,13 +111,13 @@ fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &Slur
                 debug!("Archive subdir {:?} does not yet exist, creating", &d);
                 create_dir_all(&archive_subdir_path).unwrap();
             }
-            archive_subdir_path.clone().join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+            archive_subdir_path.clone().join(format!("job.{}_{}", &job_entry.jobid, &filename))
         },
-        None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+        None => archive_path.join(format!("job.{}_{}", &job_entry.jobid, &filename))
     }
 }
 
-/// Archives the files from the given SlurmJobEntry's path.
+/// Archives the files from the given TorqueJobEntry's path.
 /// 
 /// We busy wait for 1 second, sleeping for 10 ms per turn for
 /// the environment and script files to appear.
@@ -123,52 +125,33 @@ fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &Slur
 /// and return without copying. 
 /// If the directory dissapears before we found or copied the files, 
 /// we panic.
-fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+fn archive(archive_path: &Path, p: &Period, job_entry: &TorqueJobEntry) -> Result<(), Error> {
     // We wait for each file to be present
-    let ten_millis = Duration::from_millis(10);
-    for filename in &["script", "environment"] {
-        let fpath = slurm_job_entry.path.join(filename);
-        let mut iters = 100;
-        while !Path::exists(&fpath) && iters > 0 {
-            debug!("Waiting for {:?}", fpath);
-            sleep(ten_millis);
-            if !Path::exists(&slurm_job_entry.path) {
-                error!("Job directory {:?} no longer exists", &slurm_job_entry.path);
-                panic!("path not found");
-            }
-            iters -= 1;
-        }
-        if iters == 0 {
-            warn!("Cannot make copy of {:?}", fpath);
-            continue;
-        }
-
-        let target_path =  determine_target_path(&archive_path, &p, &slurm_job_entry, &filename);
+    let fpath = &job_entry.path;
+    let target_path =  determine_target_path(&archive_path, &p, &job_entry, &job_entry.file_type);
         
-        match copy(&fpath, &target_path) {
-            Ok(bytes) => info!(
-                "copied {} bytes from {:?} to {:?}",
-                bytes, &fpath, &target_path
-            ),
-            Err(e) => {
-                error!(
-                    "Copy of {:?} to {:?} failed: {:?}",
-                    &slurm_job_entry.path, &target_path, e
-                );
-                return Err(e);
-            }
-        };
-    }
-
+    match copy(&fpath, &target_path) {
+        Ok(bytes) => info!(
+            "copied {} bytes from {:?} to {:?}",
+            bytes, &fpath, &target_path
+        ),
+        Err(e) => {
+            error!(
+                "Copy of {:?} to {:?} failed: {:?}",
+                &job_entry.path, &target_path, e
+            );
+            return Err(e);
+        }
+    };
     Ok(())
 }
 
-fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
+fn check_and_queue(s: &Sender<TorqueJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
     match event {
         DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-            if let Some((jobid, _dirname)) = is_job_path(&path) {
-                let e = SlurmJobEntry::new(&path, jobid);
+            if let Some((jobid, _dirname, file_type)) = is_job_path(&path) {
+                let e = TorqueJobEntry::new(&path, jobid, &file_type);
                 s.send(e).unwrap();
             };
         }
@@ -178,12 +161,11 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(
     Ok(())
 }
 
-pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Result<()> {
+pub fn monitor(path: &Path, s: &Sender<TorqueJobEntry>) -> notify::Result<()> {
     let (tx, rx) = channel();
 
     // create a platform-specific watcher
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
-    let path = base.join(format!("hash.{}", hash));
 
     info!("Watching path {:?}", &path);
 
@@ -201,12 +183,12 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Resu
     Ok(())
 }
 
-pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>) {
+pub fn process(archive_path: &Path, p: Period, r: &Receiver<TorqueJobEntry>) {
     loop {
         match r.recv() {
             Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
             Err(_) => {
-                error!("Error on receiving SlurmJobEntry info");
+                error!("Error on receiving TorqueJobEntry info");
                 break;
             }
         };
@@ -247,7 +229,7 @@ mod tests {
         // create the basic archive path
         let archive_dir = tdir.path();
         let _dir = create_dir(&archive_dir);
-        let slurm_job_entry = SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
+        let slurm_job_entry = TorqueJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
 
         let p = Period::None;
         let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
@@ -296,7 +278,7 @@ mod tests {
         job.write(b"job script");
 
 
-        let slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234");
+        let slurm_job_entry = TorqueJobEntry::new(&job_dir, "1234");
 
         archive(&archive_dir, &Period::None, &slurm_job_entry);
 

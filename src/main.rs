@@ -103,6 +103,13 @@ fn main() {
                 )
         )
         .arg(
+            Arg::with_name("subdirs")
+                .long("subdirs")
+                .help(
+                    "Watch the subdirectories 0..9 of the job spool dir."
+                )
+        )
+        .arg(
             Arg::with_name("spool")
                 .long("spool")
                 .short("s")
@@ -133,7 +140,7 @@ fn main() {
     let base = Path::new(
         matches
             .value_of("spool")
-            .expect("You must provide the location of the hash dirs."),
+            .expect("You must provide the location of the job spool dir."),
     );
     let archive = Path::new(
         matches
@@ -141,7 +148,7 @@ fn main() {
             .expect("You must provide the location of the archive"),
     );
 
-    info!("sarchive starting. Watching hash dirs in {:?}. Archiving under {:?}.", &base, &archive);
+    info!("sarchive for torque starting. Watching {:?}. Archiving under {:?}.", &base, &archive);
 
     if !base.is_dir() {
         error!("Provided base {:?} is not a valid directory", base);
@@ -158,14 +165,27 @@ fn main() {
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
     if let Err(e) = scope(|s| {
-        for hash in 0..10 {
+
+        if matches.is_present("subdirs") {
+            for subdir in 0..9 {
+                let t = &sender;
+                let sd = subdir;
+                let p = base.join(format!("{}", subdir)).to_owned();
+                s.spawn(move |_| match monitor(&p, &t) {
+                    Ok(_) => info!("Stopped watching subdir {}", &sd),
+                    Err(e) => {
+                        error!("{}", e);
+                        panic!("Error watching subdir {}", &sd);
+                    }
+                });
+            }
+        } else {
             let t = &sender;
-            let h = hash;
-            s.spawn(move |_| match monitor(base, hash, t) {
-                Ok(_) => info!("Stopped watching hash.{}", &h),
+            s.spawn(move |_| match monitor(&base, t) {
+                Ok(_) => info!("Stopped watching subdir {:?}", &base),
                 Err(e) => {
-                    error!("{}", e);
-                    panic!("Error watching hash.{}", &h);
+                        error!("{:?}", e);
+                        panic!("Error watching {:?}", &base);
                 }
             });
         }
