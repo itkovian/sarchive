@@ -214,6 +214,7 @@ pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>, sigc
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {
+                info!("Stopped processing entries");
                 return;
             },
             recv(r) -> entry => { match entry {
