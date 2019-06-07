@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.4.2"
+version = "0.5.0"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2018"
 description = "Archiving tool for slurm job scripts"
@@ -21,12 +21,14 @@ crossbeam = "0.7.1"
 crossbeam-channel = "0.3.7"
 crossbeam-queue = "0.1.2"
 crossbeam-utils = "0.6.5"
-notify = "^4.0.11"
+#notify = "4.0.12"
+notify = { git = "https://github.com/passcod/notify", branch = "main" }
 libc = "^0.2.4"
 log = "^0.4.6"
 rayon = "^1.0.3"
 fern = "0.5.8"
 syslog = "4.0.1" 
+signal-hook = "^0.1.9"
 chrono = "0.4.6"
 
 [dev-dependencies]

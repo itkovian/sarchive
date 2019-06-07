@@ -23,13 +23,15 @@ extern crate chrono;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use log::*;
-use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
+use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::channel;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -163,12 +165,12 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
     Ok(())
 }
 
-fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
+fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
-    match event {
-        DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
-            if let Some((jobid, _dirname)) = is_job_path(&path) {
-                let e = SlurmJobEntry::new(&path, jobid);
+    match event.kind {
+        EventKind::Create(Any) => {
+            if let Some((jobid, _dirname)) = is_job_path(&event.paths[0]) {
+                let e = SlurmJobEntry::new(&event.paths[0], jobid);
                 s.send(e).unwrap();
             };
         }
@@ -178,8 +180,8 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: DebouncedEvent) -> Result<(
     Ok(())
 }
 
-pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Result<()> {
-    let (tx, rx) = channel();
+pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>, sigchannel: &Receiver<bool>) -> notify::Result<()> {
+    let (tx, rx) = unbounded();
 
     // create a platform-specific watcher
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
@@ -189,27 +191,39 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>) -> notify::Resu
 
     if let Err(e) = watcher.watch(&path, RecursiveMode::NonRecursive) { return Err(e); } 
     loop {
-        match rx.recv() {
-            Ok(event) => check_and_queue(s, event)?,
-            Err(e) => {
-                error!("Error on received event: {:?}", e);
-                break;
-            }
-        };
-    }
+        select! {
+            recv(sigchannel) -> b => if let Ok(true) = b  {
+                return Ok(());
+            },
+            recv(rx) -> event => { match event {
+                Ok(e) => check_and_queue(s, e.unwrap())?,
+                Err(e) => {
+                    error!("Error on received event: {:?}", e);
+                    break;
+                }
+            };}
+        }
+    };
 
     Ok(())
 }
 
-pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>) {
+pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>, sigchannel: &Receiver<bool>) {
+
+    info!("Start processing events");
     loop {
-        match r.recv() {
-            Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
-            Err(_) => {
-                error!("Error on receiving SlurmJobEntry info");
-                break;
-            }
-        };
+        select! {
+            recv(sigchannel) -> b => if let Ok(true) = b  {
+                return;
+            },
+            recv(r) -> entry => { match entry {
+                Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
+                Err(_) => {
+                    error!("Error on receiving SlurmJobEntry info");
+                    break;
+                }
+            };}
+        }
     };
 }
 

@@ -31,11 +31,13 @@ extern crate fern;
 extern crate syslog;
 
 use clap::{App, Arg};
-use crossbeam_channel::unbounded;
+use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::thread::scope;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::process::exit;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 mod lib;
 use lib::{monitor, process, Period};
@@ -155,13 +157,37 @@ fn main() {
         }
     }
 
+    let sig = Arc::new(AtomicUsize::new(0));
+    const SIGTERM: usize = signal_hook::SIGTERM as usize;
+    const SIGINT: usize = signal_hook::SIGINT as usize;
+
+    info!("Registering signal handler for SIGTERM");
+    signal_hook::flag::register_usize(signal_hook::SIGTERM, Arc::clone(&sig),  SIGTERM);
+
+    info!("Registering signal handler for SIGINT");
+    signal_hook::flag::register_usize(signal_hook::SIGINT, Arc::clone(&sig), SIGINT);
+
+    let (sig_sender, sig_receiver) = bounded(100);
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
     if let Err(e) = scope(|s| {
+
+        let ss = &sig_sender;
+        s.spawn(move |_| {
+            loop {
+                match sig.load(Ordering::Relaxed) {
+                    0 => {},
+                    SIGTERM => panic!("SIGTERM"),
+                    SIGINT => panic!("SIGINT"),
+                    _ => unreachable!()
+                }
+            }
+        });
         for hash in 0..10 {
             let t = &sender;
             let h = hash;
-            s.spawn(move |_| match monitor(base, hash, t) {
+            let sr = &sig_receiver;
+            s.spawn(move |_| match monitor(base, hash, t, sr) {
                 Ok(_) => info!("Stopped watching hash.{}", &h),
                 Err(e) => {
                     error!("{}", e);
@@ -170,7 +196,8 @@ fn main() {
             });
         }
         let r = &receiver;
-        s.spawn(move |_| process(archive, period, r));
+        let sr = &sig_receiver;
+        s.spawn(move |_| process(archive, period, r, sr));
     }) {
         error!("sarchive stopping due to error: {:?}", e);
         exit(1);
