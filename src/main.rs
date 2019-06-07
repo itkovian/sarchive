@@ -177,8 +177,12 @@ fn main() {
             loop {
                 match sig.load(Ordering::Relaxed) {
                     0 => {},
-                    SIGTERM => panic!("SIGTERM"),
-                    SIGINT => panic!("SIGINT"),
+                    SIGTERM | SIGINT => {
+                        for i in 0..20 {
+                            sig_sender.send(true);
+                        }
+                        break;
+                    }
                     _ => unreachable!()
                 }
             }
