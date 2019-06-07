@@ -38,6 +38,8 @@ use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread::sleep;
+use std::time::Duration;
 
 mod lib;
 use lib::{monitor, process, Period};
@@ -174,9 +176,12 @@ fn main() {
 
         let ss = &sig_sender;
         s.spawn(move |_| {
+            let ten_millis = Duration::from_millis(10);
             loop {
                 match sig.load(Ordering::Relaxed) {
-                    0 => {},
+                    0 => {
+                        sleep(ten_millis);
+                    },
                     SIGTERM | SIGINT => {
                         for i in 0..20 {
                             sig_sender.send(true);
