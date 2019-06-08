@@ -31,7 +31,7 @@ extern crate fern;
 extern crate syslog;
 
 use clap::{App, Arg};
-use crossbeam_channel::{bounded, unbounded};
+use crossbeam_channel::{bounded, unbounded, Sender};
 use crossbeam_utils::thread::scope;
 use std::fs::create_dir_all;
 use std::path::Path;
@@ -43,6 +43,29 @@ use std::time::Duration;
 
 mod lib;
 use lib::{monitor, process, Period};
+
+const SIGTERM: usize = signal_hook::SIGTERM as usize;
+const SIGINT: usize = signal_hook::SIGINT as usize;
+
+fn signal_handler(b: &Arc<AtomicUsize>, sig_sender: &Sender<bool>, ) {
+
+    let ten_millis = Duration::from_millis(10);
+    loop {
+        match b.load(Ordering::Relaxed) {
+            0 => {
+                sleep(ten_millis);
+            },
+            SIGTERM | SIGINT => {
+                for i in 0..20 {
+                    sig_sender.send(true);
+                }
+                break;
+            },
+            _ => unreachable!()
+        }
+    }
+
+}
 
 fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
     let base_config = fern::Dispatch::new()
@@ -160,8 +183,6 @@ fn main() {
     }
 
     let sig = Arc::new(AtomicUsize::new(0));
-    const SIGTERM: usize = signal_hook::SIGTERM as usize;
-    const SIGINT: usize = signal_hook::SIGINT as usize;
 
     info!("Registering signal handler for SIGTERM");
     signal_hook::flag::register_usize(signal_hook::SIGTERM, Arc::clone(&sig),  SIGTERM);
@@ -173,25 +194,8 @@ fn main() {
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
     if let Err(e) = scope(|s| {
-
         let ss = &sig_sender;
-        s.spawn(move |_| {
-            let ten_millis = Duration::from_millis(10);
-            loop {
-                match sig.load(Ordering::Relaxed) {
-                    0 => {
-                        sleep(ten_millis);
-                    },
-                    SIGTERM | SIGINT => {
-                        for i in 0..20 {
-                            sig_sender.send(true);
-                        }
-                        break;
-                    }
-                    _ => unreachable!()
-                }
-            }
-        });
+        s.spawn(move |_| { signal_handler(&sig, ss) });
         for hash in 0..10 {
             let t = &sender;
             let h = hash;
