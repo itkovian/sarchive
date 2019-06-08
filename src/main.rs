@@ -31,7 +31,7 @@ extern crate fern;
 extern crate syslog;
 
 use clap::{App, Arg};
-use crossbeam_channel::{bounded, unbounded, Sender};
+use crossbeam_channel::{bounded, unbounded, select, Sender, Receiver};
 use crossbeam_utils::thread::scope;
 use std::fs::create_dir_all;
 use std::path::Path;
@@ -44,27 +44,17 @@ use std::time::Duration;
 mod lib;
 use lib::{monitor, process, Period};
 
-const SIGTERM: usize = signal_hook::SIGTERM as usize;
-const SIGINT: usize = signal_hook::SIGINT as usize;
-
-fn signal_handler(b: &Arc<AtomicUsize>, sig_sender: &Sender<bool>, ) {
-
-    let ten_millis = Duration::from_millis(10);
+fn signal_handler(sender: &Sender<bool>, rs_term: &Receiver<bool>, rs_int: &Receiver<bool>) {
     loop {
-        match b.load(Ordering::Relaxed) {
-            0 => {
-                sleep(ten_millis);
-            },
-            SIGTERM | SIGINT => {
-                for i in 0..20 {
-                    sig_sender.send(true);
-                }
-                break;
-            },
-            _ => unreachable!()
+        select! {
+            recv(rs_term) -> _ => { break; },
+            recv(rs_int) -> _ => { break; }
         }
     }
-
+    for i in 0..20 {
+        sender.send(true);
+    }
+    info!("Sent 20 notifications");
 }
 
 fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
@@ -182,20 +172,22 @@ fn main() {
         }
     }
 
-    let sig = Arc::new(AtomicUsize::new(0));
-
     info!("Registering signal handler for SIGTERM");
-    signal_hook::flag::register_usize(signal_hook::SIGTERM, Arc::clone(&sig),  SIGTERM);
+    let (sigterm_sender, sigterm_receiver) = bounded(4);
+    unsafe { signal_hook::register(signal_hook::SIGTERM, move || { info!("Received SIGTERM"); sigterm_sender.send(true); }) };
 
     info!("Registering signal handler for SIGINT");
-    signal_hook::flag::register_usize(signal_hook::SIGINT, Arc::clone(&sig), SIGINT);
+    let (sigint_sender, sigint_receiver) = bounded(4);
+    unsafe { signal_hook::register(signal_hook::SIGINT, move || { info!("Received SIGINT"); sigint_sender.send(true); }) };
 
-    let (sig_sender, sig_receiver) = bounded(100);
+
+    let (sig_sender, sig_receiver) = bounded(20);
+
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
-        s.spawn(move |_| { signal_handler(&sig, ss) });
+        s.spawn(move |_| { signal_handler(ss, &sigterm_receiver, &sigint_receiver); info!("Done"); });
         for hash in 0..10 {
             let t = &sender;
             let h = hash;
