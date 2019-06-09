@@ -31,31 +31,16 @@ extern crate fern;
 extern crate syslog;
 
 use clap::{App, Arg};
-use crossbeam_channel::{bounded, unbounded, select, Sender, Receiver};
+use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::thread::scope;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::thread::sleep;
-use std::time::Duration;
+use std::sync::atomic::AtomicBool;
 
 mod lib;
-use lib::{monitor, process, Period};
-
-fn signal_handler(sender: &Sender<bool>, rs_term: &Receiver<bool>, rs_int: &Receiver<bool>) {
-    loop {
-        select! {
-            recv(rs_term) -> _ => { break; },
-            recv(rs_int) -> _ => { break; }
-        }
-    }
-    for i in 0..20 {
-        sender.send(true);
-    }
-    info!("Sent 20 notifications");
-}
+use lib::{monitor, process, Period, signal_handler_atomic};
 
 fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
     let base_config = fern::Dispatch::new()
@@ -172,14 +157,13 @@ fn main() {
         }
     }
 
+    let notification = Arc::new(AtomicBool::new(false));
+
     info!("Registering signal handler for SIGTERM");
-    let (sigterm_sender, sigterm_receiver) = bounded(4);
-    unsafe { signal_hook::register(signal_hook::SIGTERM, move || { info!("Received SIGTERM"); sigterm_sender.send(true); }) };
+    signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&notification));
 
     info!("Registering signal handler for SIGINT");
-    let (sigint_sender, sigint_receiver) = bounded(4);
-    unsafe { signal_hook::register(signal_hook::SIGINT, move || { info!("Received SIGINT"); sigint_sender.send(true); }) };
-
+    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&notification));
 
     let (sig_sender, sig_receiver) = bounded(20);
 
@@ -187,7 +171,7 @@ fn main() {
     let (sender, receiver) = unbounded();
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
-        s.spawn(move |_| { signal_handler(ss, &sigterm_receiver, &sigint_receiver); info!("Done"); });
+        s.spawn(move |_| { signal_handler_atomic(ss, notification); info!("Signal handled"); });
         for hash in 0..10 {
             let t = &sender;
             let h = hash;

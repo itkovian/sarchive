@@ -24,16 +24,17 @@ extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
+use crossbeam_utils::Backoff;
 use log::*;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
-use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::sleep;
 use std::time::Duration;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
@@ -168,7 +169,7 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
 fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
     match event.kind {
-        EventKind::Create(Any) => {
+        EventKind::Create(_) => {
             if let Some((jobid, _dirname)) = is_job_path(&event.paths[0]) {
                 let e = SlurmJobEntry::new(&event.paths[0], jobid);
                 s.send(e).unwrap();
@@ -226,6 +227,17 @@ pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>, sigc
             };}
         }
     };
+}
+
+pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>) {
+    let backoff = Backoff::new();
+    while !sig.load(SeqCst) {
+        backoff.snooze();
+    }
+    for _ in 0..20 {
+        sender.send(true);
+    }
+    info!("Sent 20 notifications");
 }
 
 #[cfg(test)]
