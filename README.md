@@ -32,9 +32,19 @@ The archive can be further divided into subdirectories per
   - month: YYYYMM, by providing `--period=montly`
   - day: YYYYMMDD, by providing `--period=daily`
 This allows for easily tarring old(er) directories you still wish to keep around, 
-but probably no longer immediately need for user support.
+but probably no longer immediately need for user support. Each of these directories
+are also created upon file archival if they do not exist.
 
 `sarchive -s /var/spool/slurm -a /var/backups/slurm/job-archive`
+
+## Features
+
+- Multithreaded, watching one hash dir per thread.
+- Separate processing thread to ensure swift draining of the inotify event queues.
+- Clean log rotation when SIGHUP is received.
+- Experimental support for clean termination on receipt of SIGTERM or SIGINT, where
+  job events that have already been seen are processed, to minimise potential loss
+  when restarting the service.
 
 ## RPMs
 
