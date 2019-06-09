@@ -34,7 +34,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
-use std::thread::{park, sleep};
+use std::thread::sleep;
 use std::time::Duration;
 
 /// Representation of an entry in the Slurm job spool hash directories
@@ -240,12 +240,19 @@ pub fn process(
     p: Period,
     r: &Receiver<SlurmJobEntry>,
     sigchannel: &Receiver<bool>,
+    cleanup: bool,
 ) {
     info!("Start processing events");
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {
-                info!("Stopped processing entries");
+                if !cleanup {
+                    info!("Stopped processing entries, {} skipped", r.len());
+                } else {
+                info!("Processing {} entries, then stopping", r.len());
+                r.iter().map(|entry| archive(&archive_path, &p, &entry).unwrap());
+                info!("Done processing");
+                }
                 return;
             },
             recv(r) -> entry => { match entry {

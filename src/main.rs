@@ -111,6 +111,13 @@ fn main() {
                 )
         )
         .arg(
+            Arg::with_name("cleanup")
+                .long("cleanup")
+                .help(
+                    "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
+                )
+        )
+        .arg(
             Arg::with_name("spool")
                 .long("spool")
                 .short("s")
@@ -197,6 +204,8 @@ fn main() {
 
     let (sig_sender, sig_receiver) = bounded(20);
 
+    let cleanup = matches.is_present("cleanup");
+
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
     if let Err(e) = scope(|s| {
@@ -219,7 +228,7 @@ fn main() {
         }
         let r = &receiver;
         let sr = &sig_receiver;
-        s.spawn(move |_| process(archive, period, r, sr));
+        s.spawn(move |_| process(archive, period, r, sr, cleanup));
     }) {
         error!("sarchive stopping due to error: {:?}", e);
         exit(1);
