@@ -38,7 +38,7 @@ use crossbeam_utils::thread::scope;
 use reopen::Reopen;
 use std::fs::{File, OpenOptions};
 use std::fs::create_dir_all;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
@@ -75,9 +75,7 @@ fn setup_logging(
 
     match logfile {
         Some(filename) => {
-            let f = filename.to_string();
-            let r = Reopen::new(Box::new(move || my_open(&f))).unwrap();
-            r.handle().register_signal(libc::SIGHUP).unwrap();
+            let r = fern::log_reopen(&PathBuf::from(filename), Some(libc::SIGHUP)).unwrap();
             base_config.chain(r)
         }, 
         None => base_config.chain(std::io::stdout())
