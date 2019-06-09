@@ -23,19 +23,22 @@ extern crate chrono;
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
-extern crate notify;
-
+extern crate fern;
+extern crate libc;
 #[macro_use]
 extern crate log;
-extern crate fern;
+extern crate notify;
+extern crate reopen;
 extern crate syslog;
 
 use clap::{App, Arg};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
+use reopen::Reopen;
+use std::fs::{File, OpenOptions};
 use std::fs::create_dir_all;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
@@ -43,6 +46,16 @@ use std::sync::Arc;
 
 mod lib;
 use lib::{monitor, process, signal_handler_atomic, Period};
+
+#[inline]
+fn my_open<P: AsRef<Path>>(filename: P) -> Result<File, std::io::Error> {
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(true)
+        .open(filename)
+}
+
 
 fn setup_logging(
     level_filter: log::LevelFilter,
@@ -61,15 +74,17 @@ fn setup_logging(
         .level(level_filter);
 
     match logfile {
-        Some(filename) => base_config.chain(fern::log_file(filename).unwrap()),
-        None => base_config.chain(std::io::stdout()),
-    }
-    .apply()
+        Some(filename) => {
+            let r = fern::log_reopen(&PathBuf::from(filename), Some(libc::SIGHUP)).unwrap();
+            base_config.chain(r)
+        }, 
+        None => base_config.chain(std::io::stdout())
+    }.apply()
 }
 
 fn main() {
     let matches = App::new("SArchive")
-        .version("0.5.0")
+        .version("0.6.0")
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
         .arg(
