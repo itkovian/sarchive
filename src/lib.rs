@@ -24,18 +24,18 @@ extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
-use crossbeam_utils::Backoff;
 use crossbeam_utils::sync::Parker;
+use crossbeam_utils::Backoff;
 use log::*;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
 use std::thread::{park, sleep};
 use std::time::Duration;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
@@ -96,14 +96,19 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
 /// - a subdir depending on the Period
 ///     - YYYY in case of a Yearly Period
 ///     - YYYYMM in case of a Monthly Period
-///     - YYYYMMDD in case of a Daily Period 
+///     - YYYYMMDD in case of a Daily Period
 /// - a file with the given filename
-fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry, filename: &str) -> PathBuf {
+fn determine_target_path(
+    archive_path: &Path,
+    p: &Period,
+    slurm_job_entry: &SlurmJobEntry,
+    filename: &str,
+) -> PathBuf {
     let archive_subdir = match p {
         Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
         Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%m"))),
         Period::Daily => Some(format!("{}", chrono::Local::now().format("%Y%m%d"))),
-        _ => None
+        _ => None,
     };
     debug!("Archive subdir is {:?}", &archive_subdir);
     match archive_subdir {
@@ -113,19 +118,21 @@ fn determine_target_path(archive_path: &Path, p: &Period, slurm_job_entry: &Slur
                 debug!("Archive subdir {:?} does not yet exist, creating", &d);
                 create_dir_all(&archive_subdir_path).unwrap();
             }
-            archive_subdir_path.clone().join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
-        },
-        None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+            archive_subdir_path
+                .clone()
+                .join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
+        }
+        None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename)),
     }
 }
 
 /// Archives the files from the given SlurmJobEntry's path.
-/// 
+///
 /// We busy wait for 1 second, sleeping for 10 ms per turn for
 /// the environment and script files to appear.
 /// If the files cannot be found after that tine, we output a warning
-/// and return without copying. 
-/// If the directory dissapears before we found or copied the files, 
+/// and return without copying.
+/// If the directory dissapears before we found or copied the files,
 /// we panic.
 fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
     // We wait for each file to be present
@@ -147,8 +154,8 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
             continue;
         }
 
-        let target_path =  determine_target_path(&archive_path, &p, &slurm_job_entry, &filename);
-        
+        let target_path = determine_target_path(&archive_path, &p, &slurm_job_entry, &filename);
+
         match copy(&fpath, &target_path) {
             Ok(bytes) => info!(
                 "copied {} bytes from {:?} to {:?}",
@@ -167,10 +174,9 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
     Ok(())
 }
 
-
-/// The check_and_queue function verifies that the inotify event pertains 
-/// and actual Slurm job entry and pushes the correct information to the 
-/// channel so it can be processed later on. 
+/// The check_and_queue function verifies that the inotify event pertains
+/// and actual Slurm job entry and pushes the correct information to the
+/// channel so it can be processed later on.
 fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
     match event.kind {
@@ -186,12 +192,16 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error>
     Ok(())
 }
 
-
 /// The monitor function uses a platform-specific watcher to track inotify events on
 /// the given path, formed by joining the base and the hash path.
 /// At the same time, it check for a notification indicating that it should stop operations
 /// upon receipt of which it immediately returns.
-pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>, sigchannel: &Receiver<bool>) -> notify::Result<()> {
+pub fn monitor(
+    base: &Path,
+    hash: u8,
+    s: &Sender<SlurmJobEntry>,
+    sigchannel: &Receiver<bool>,
+) -> notify::Result<()> {
     let (tx, rx) = unbounded();
 
     // create a platform-specific watcher
@@ -200,7 +210,9 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>, sigchannel: &Re
 
     info!("Watching path {:?}", &path);
 
-    if let Err(e) = watcher.watch(&path, RecursiveMode::NonRecursive) { return Err(e); } 
+    if let Err(e) = watcher.watch(&path, RecursiveMode::NonRecursive) {
+        return Err(e);
+    }
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {
@@ -214,17 +226,21 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>, sigchannel: &Re
                 }
             };}
         }
-    };
+    }
 
     Ok(())
 }
 
 /// The process function consumes job entries and call the archive function for each
-/// received entry. 
-/// At the same time, it also checks if there is an incoming notification that it should 
+/// received entry.
+/// At the same time, it also checks if there is an incoming notification that it should
 /// stop processing. Upon receipt, it will cease operations immediately.
-pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>, sigchannel: &Receiver<bool>) {
-
+pub fn process(
+    archive_path: &Path,
+    p: Period,
+    r: &Receiver<SlurmJobEntry>,
+    sigchannel: &Receiver<bool>,
+) {
     info!("Start processing events");
     loop {
         select! {
@@ -240,7 +256,7 @@ pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>, sigc
                 }
             };}
         }
-    };
+    }
 }
 
 /// This function will park the thread until it is unparked and check the
@@ -270,7 +286,7 @@ mod tests {
     use std::fs::{create_dir, read_to_string, File};
     use std::io::Write;
     use std::path::Path;
-    use tempfile::{tempdir};
+    use tempfile::tempdir;
 
     #[test]
     fn test_is_job_path() {
@@ -289,7 +305,6 @@ mod tests {
 
     #[test]
     fn test_determine_target_path() {
-
         let tdir = tempdir().unwrap();
 
         // create the basic archive path
@@ -323,7 +338,6 @@ mod tests {
 
     #[test]
     fn test_archive() {
-
         let tdir = tempdir().unwrap();
 
         // create the basic archive path
@@ -343,7 +357,6 @@ mod tests {
         let mut job = File::create(&job_path).unwrap();
         job.write(b"job script");
 
-
         let slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234");
 
         archive(&archive_dir, &Period::None, &slurm_job_entry);
@@ -351,7 +364,8 @@ mod tests {
         assert!(Path::is_file(&archive_dir.join("job.1234_environment")));
         assert!(Path::is_file(&archive_dir.join("job.1234_script")));
 
-        let archive_env_contents = read_to_string(&archive_dir.join("job.1234_environment")).unwrap();
+        let archive_env_contents =
+            read_to_string(&archive_dir.join("job.1234_environment")).unwrap();
         assert_eq!(&archive_env_contents, "environment");
 
         let archive_script_contents = read_to_string(&archive_dir.join("job.1234_script")).unwrap();
