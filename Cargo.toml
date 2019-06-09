@@ -22,13 +22,15 @@ crossbeam = "0.7.1"
 crossbeam-channel = "0.3.7"
 crossbeam-queue = "0.1.2"
 crossbeam-utils = "0.6.5"
-fern = { features = ["reopen-03"] }
+#notify = "4.0.12"
+notify = { git = "https://github.com/passcod/notify", branch = "main" }
 libc = "^0.2.4"
 log = "^0.4.6"
 notify = "^4.0.11"
 reopen = "^0.3.0"
 rayon = "^1.0.3"
 syslog = "4.0.1" 
+signal-hook = "^0.1.9"
 
 [dev-dependencies]
 tempfile = "3.0.7"
