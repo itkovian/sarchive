@@ -33,11 +33,13 @@ extern crate syslog;
 use clap::{App, Arg};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::thread::scope;
+use crossbeam_utils::sync::Parker;
 use std::fs::create_dir_all;
 use std::path::Path;
 use std::process::exit;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 
 mod lib;
 use lib::{monitor, process, Period, signal_handler_atomic};
@@ -158,12 +160,18 @@ fn main() {
     }
 
     let notification = Arc::new(AtomicBool::new(false));
+    let parker = Parker::new();
+    let unparker = parker.unparker().clone();
 
     info!("Registering signal handler for SIGTERM");
-    signal_hook::flag::register(signal_hook::SIGTERM, Arc::clone(&notification));
+    let u1 = unparker.clone();
+    let n1 = Arc::clone(&notification);
+    unsafe { signal_hook::register(signal_hook::SIGTERM, move || { info!("Received SIGTERM"); n1.store(true, SeqCst); u1.unpark() }) };
 
     info!("Registering signal handler for SIGINT");
-    signal_hook::flag::register(signal_hook::SIGINT, Arc::clone(&notification));
+    let u2 = unparker.clone();
+    let n2 = Arc::clone(&notification);
+    unsafe { signal_hook::register(signal_hook::SIGINT, move || { info!("Received SIGINT"); n2.store(true, SeqCst); u2.unpark() }) };
 
     let (sig_sender, sig_receiver) = bounded(20);
 
@@ -171,7 +179,7 @@ fn main() {
     let (sender, receiver) = unbounded();
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
-        s.spawn(move |_| { signal_handler_atomic(ss, notification); info!("Signal handled"); });
+        s.spawn(move |_| { signal_handler_atomic(ss, notification, &parker); info!("Signal handled"); });
         for hash in 0..10 {
             let t = &sender;
             let h = hash;

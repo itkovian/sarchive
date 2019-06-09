@@ -25,12 +25,13 @@ extern crate crossbeam_utils;
 
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use crossbeam_utils::Backoff;
+use crossbeam_utils::sync::Parker;
 use log::*;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
-use std::thread::sleep;
+use std::thread::{park, sleep};
 use std::time::Duration;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -166,6 +167,10 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
     Ok(())
 }
 
+
+/// The check_and_queue function verifies that the inotify event pertains 
+/// and actual Slurm job entry and pushes the correct information to the 
+/// channel so it can be processed later on. 
 fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
     match event.kind {
@@ -181,6 +186,11 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error>
     Ok(())
 }
 
+
+/// The monitor function uses a platform-specific watcher to track inotify events on
+/// the given path, formed by joining the base and the hash path.
+/// At the same time, it check for a notification indicating that it should stop operations
+/// upon receipt of which it immediately returns.
 pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>, sigchannel: &Receiver<bool>) -> notify::Result<()> {
     let (tx, rx) = unbounded();
 
@@ -209,6 +219,10 @@ pub fn monitor(base: &Path, hash: u8, s: &Sender<SlurmJobEntry>, sigchannel: &Re
     Ok(())
 }
 
+/// The process function consumes job entries and call the archive function for each
+/// received entry. 
+/// At the same time, it also checks if there is an incoming notification that it should 
+/// stop processing. Upon receipt, it will cease operations immediately.
 pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>, sigchannel: &Receiver<bool>) {
 
     info!("Start processing events");
@@ -229,10 +243,17 @@ pub fn process(archive_path: &Path, p: Period, r: &Receiver<SlurmJobEntry>, sigc
     };
 }
 
-pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>) {
+/// This function will park the thread until it is unparked and check the
+/// atomic bool to see if it should start notifying other threads they need
+/// to finish execution.
+pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
     let backoff = Backoff::new();
     while !sig.load(SeqCst) {
-        backoff.snooze();
+        if backoff.is_completed() {
+            p.park();
+        } else {
+            backoff.snooze();
+        }
     }
     for _ in 0..20 {
         sender.send(true);
