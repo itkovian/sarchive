@@ -86,7 +86,7 @@ fn setup_logging(
 
 fn main() {
     let matches = App::new("SArchive")
-        .version("0.5.0")
+        .version("0.6.0")
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
         .arg(
