@@ -145,7 +145,7 @@ fn main() {
                 .short("s")
                 .takes_value(true)
                 .help(
-                    "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
+                    "Location of the Torque job spool (where the job scripts and XML files are kept).",
                 )
         )
         .get_matches();
@@ -242,7 +242,8 @@ fn main() {
                 let t = &sender;
                 let sd = subdir;
                 let p = base.join(format!("{}", subdir)).to_owned();
-                s.spawn(move |_| match monitor(&p, &t) {
+                let sr = &sig_receiver;
+                s.spawn(move |_| match monitor(&p, &t, sr) {
                     Ok(_) => info!("Stopped watching subdir {}", &sd),
                     Err(e) => {
                         error!("{}", e);
@@ -252,10 +253,9 @@ fn main() {
             }
         } else {
             let t = &sender;
-            let h = hash;
             let sr = &sig_receiver;
-            s.spawn(move |_| match monitor(base, hash, t, sr) {
-                Ok(_) => info!("Stopped watching hash.{}", &h),
+            s.spawn(move |_| match monitor(base, t, sr) {
+                Ok(_) => info!("Stopped watching {:?}", &base),
                 Err(e) => {
                         error!("{:?}", e);
                         panic!("Error watching {:?}", &base);
