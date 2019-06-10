@@ -11,5 +11,5 @@ function test_and_exit() {
 
 cargo install cargo-rpm
 
-cargo build --release; test_and_exit "stack build failed"
+cargo build --release --all-features; test_and_exit "stack build failed"
 cargo rpm build; test_and_exit "rpm creation failed"

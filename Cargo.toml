@@ -1,9 +1,9 @@
 [package]
 name = "sarchive"
-version = "0.4.2"
+version = "0.9.3"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2018"
-description = "Archiving tool for slurm job scripts"
+description = "Archival tool for slurm job scripts"
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/itkovian/sarchive"
@@ -16,18 +16,33 @@ travis-ci = { repository = "itkovian/sarchive" }
 coveralls = { repository = "itkovian/sarchive" }
 
 [dependencies]
+chrono = { version = "0.4.10", features = ["serde"] }
 clap = "2.33"
-crossbeam = "0.7.1"
-crossbeam-channel = "0.3.7"
-crossbeam-queue = "0.1.2"
-crossbeam-utils = "0.6.5"
-notify = "^4.0.11"
-libc = "^0.2.4"
-log = "^0.4.6"
-rayon = "^1.0.3"
-fern = "0.5.8"
-syslog = "4.0.1" 
-chrono = "0.4.6"
+crossbeam = "0.7.3"
+crossbeam-channel = "0.4.0"
+crossbeam-queue = "0.2.0"
+crossbeam-utils = "0.7.0"
+fern = { version = "0.5.9", features = ["reopen-03"]}
+futures = "^0.1"
+#futures = "^0.3"
+#notify = "5.0.0-pre.1"
+notify = { git = "https://github.com/passcod/notify", rev = "e04ec0236b2" }  # following latest main branch
+libc = "0.2.60"
+log = "^0.4"
+reopen = "^0.3.0"
+signal-hook = "^0.1.12"
+
+elastic = { version = "~0.21.0-pre.5", optional = true }
+elastic_derive = { version = "~0.21.0-pre.5", optional = true }
+serde = { version = "^1.0.103", features = ["derive"], optional = true }
+serde_derive = { version = "^1.0.103", optional = true }
+serde_json = { version = "^1.0.42", optional = true }
+rdkafka = { git = "https://github.com/fede1024/rust-rdkafka", rev = "46f9a0a", optional = true }
+#rdkafka = { git = "https://github.com/dbcfd/rust-rdkafka", rev = "96009ad", optional = true }
+
+[features]
+elasticsearch-7 = ["elastic", "elastic_derive", "serde", "serde_derive", "serde_json"]
+kafka = ["rdkafka", "serde", "serde_derive", "serde_json"]
 
 [dev-dependencies]
 tempfile = "3.0.7"
@@ -40,3 +55,5 @@ sarchive = { path = "/usr/bin/sarchive" }
 
 [package.metadata.rpm.files]
 service = { path = "/usr/lib/systemd/system/sarchive.service" }
+
+maintenance = { status = "actively-developed" }

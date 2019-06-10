@@ -19,28 +19,39 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-extern crate chrono;
-extern crate clap;
-extern crate crossbeam_channel;
-extern crate crossbeam_utils;
-extern crate notify;
 
-#[macro_use]
-extern crate log;
-extern crate fern;
-extern crate syslog;
-
-use clap::{App, Arg};
-use crossbeam_channel::unbounded;
+use chrono;
+use clap::{App, Arg, ArgMatches};
+use crossbeam_channel::{bounded, unbounded, Sender};
+use crossbeam_utils::sync::{Parker, Unparker};
 use crossbeam_utils::thread::scope;
-use std::fs::create_dir_all;
-use std::path::Path;
+use crossbeam_utils::Backoff;
+use log::{error, info};
+use std::path::{Path, PathBuf};
 use std::process::exit;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
 
-mod lib;
-use lib::{monitor, process, Period};
+mod archive;
+mod monitor;
+mod scheduler;
 
-fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
+#[cfg(feature = "elasticsearch-7")]
+use archive::elastic as el;
+use archive::file;
+#[cfg(feature = "kafka")]
+use archive::kafka as kf;
+use archive::{archive_builder, process, Archive};
+use monitor::monitor;
+use scheduler::{create, SchedulerKind};
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn setup_logging(
+    level_filter: log::LevelFilter,
+    logfile: Option<&str>,
+) -> Result<(), log::SetLoggerError> {
     let base_config = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -54,23 +65,20 @@ fn setup_logging(level_filter: log::LevelFilter, logfile: Option<&str>) -> Resul
         .level(level_filter);
 
     match logfile {
-        Some(filename) => base_config.chain(fern::log_file(filename).unwrap()),
-        None => base_config.chain(std::io::stdout())
-    }.apply()
+        Some(filename) => {
+            let r = fern::log_reopen(&PathBuf::from(filename), Some(libc::SIGHUP)).unwrap();
+            base_config.chain(r)
+        }
+        None => base_config.chain(std::io::stdout()),
+    }
+    .apply()
 }
 
-fn main() {
+fn args<'a>() -> ArgMatches<'a> {
     let matches = App::new("SArchive")
-        .version("0.1.0")
+        .version(VERSION)
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
-        .arg(
-            Arg::with_name("archive")
-                .long("archive")
-                .short("a")
-                .takes_value(true)
-                .help("Location of the job scripts' archive."),
-        )
         .arg(
             Arg::with_name("cluster")
                 .long("cluster")
@@ -84,23 +92,19 @@ fn main() {
                 .help("Log at DEBUG level.")
         )
         .arg(
-            Arg::with_name("logfile")
-                .long("logfile")
-                .short("l")
-                .takes_value(true)
-                .help("Log file name.")
+            Arg::with_name("cleanup")
+                .long("cleanup")
+                .help(
+                    "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
+                )
         )
         .arg(
-            Arg::with_name("period")
-                .long("period")
-                .short("p")
+            Arg::with_name("scheduler")
+                .long("scheduler")
                 .takes_value(true)
-                .possible_value("yearly")
-                .possible_value("monthly")
-                .possible_value("daily")
-                .help(
-                    "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
-                )
+                .default_value("slurm")
+                .possible_values(&["slurm"])
+                .help("Supported schedulers")
         )
         .arg(
             Arg::with_name("subdirs")
@@ -118,7 +122,48 @@ fn main() {
                     "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
                 )
         )
-        .get_matches();
+        .subcommand(file::clap_subcommand("file"));
+
+    #[cfg(feature = "elasticsearch-7")]
+    let matches = matches.subcommand(el::clap_subcommand("elasticsearch"));
+    #[cfg(feature = "kafka")]
+    let matches = matches.subcommand(kf::clap_subcommand("kafka"));
+    matches.get_matches()
+}
+
+fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
+    info!("Registering signal handler for signal {}", signal);
+    let u1 = unparker.clone();
+    let n1 = Arc::clone(&notification);
+    unsafe {
+        if let Err(e) = signal_hook::register(signal, move || {
+            info!("Received signal {}", signal);
+            n1.store(true, SeqCst);
+            u1.unpark()
+        }) {
+            error!("Cannot register signal {}: {:?}", signal, e);
+            exit(1);
+        }
+    };
+}
+
+pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
+    let backoff = Backoff::new();
+    while !sig.load(SeqCst) {
+        if backoff.is_completed() {
+            p.park();
+        } else {
+            backoff.snooze();
+        }
+    }
+    for _ in 0..20 {
+        sender.send(true).unwrap();
+    }
+    info!("Sent 20 notifications");
+}
+
+fn main() {
+    let matches = args();
 
     let log_level = if matches.is_present("debug") {
         log::LevelFilter::Debug
@@ -127,44 +172,46 @@ fn main() {
     };
     match setup_logging(log_level, matches.value_of("logfile")) {
         Ok(_) => (),
-        Err(e) => panic!("Cannot set up logging: {:?}", e)
+        Err(e) => panic!("Cannot set up logging: {:?}", e),
     };
-
-    let period = match matches.value_of("period") {
-        Some("yearly") => Period::Yearly,
-        Some("monthly") => Period::Monthly,
-        Some("daily") => Period::Daily,
-        _ => Period::None,
-    };
-
     let base = Path::new(
         matches
             .value_of("spool")
-            .expect("You must provide the location of the job spool dir."),
+            .expect("You must provide the location of the spool dir."),
     );
-    let archive = Path::new(
-        matches
-            .value_of("archive")
-            .expect("You must provide the location of the archive"),
-    );
-
-    info!("sarchive for torque starting. Watching {:?}. Archiving under {:?}.", &base, &archive);
-
+    // FIXME: Check for permissions to read directory contents
     if !base.is_dir() {
-        error!("Provided base {:?} is not a valid directory", base);
+        error!("Provided spool {:?} is not a valid directory", base);
         exit(1);
     }
-    if !archive.is_dir() {
-        warn!("Provided archive {:?} is not a valid directory, creating it.", &archive);
-        if let Err(e) = create_dir_all(&archive) {
-            error!("Unable to create archive at {:?}. {}", &archive, e);
-            exit(1);
-        }
-    }
+
+    let scheduler_kind = match matches.value_of("scheduler") {
+        Some("slurm") => SchedulerKind::Slurm,
+        _ => panic!("Unsupported scheduler"), // This should have been handled by clap, so never arrive here
+    };
+    let archiver: Box<dyn Archive> = archive_builder(&matches).unwrap();
+
+    info!("sarchive starting. Watching spool {:?}.", &base);
+
+    let notification = Arc::new(AtomicBool::new(false));
+    let parker = Parker::new();
+    let unparker = parker.unparker();
+
+    register_signal_handler(signal_hook::SIGTERM, &unparker, &notification);
+    register_signal_handler(signal_hook::SIGINT, &unparker, &notification);
+
+    let (sig_sender, sig_receiver) = bounded(20);
+    let cleanup = matches.is_present("cleanup");
 
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
     if let Err(e) = scope(|s| {
+        let ss = &sig_sender;
+        s.spawn(move |_| {
+            signal_handler_atomic(ss, notification, &parker);
+            info!("Signal handled");
+        });
+        for hash in 0..10 {
 
         if matches.is_present("subdirs") {
             for subdir in 0..9 {
@@ -181,8 +228,11 @@ fn main() {
             }
         } else {
             let t = &sender;
-            s.spawn(move |_| match monitor(&base, t) {
-                Ok(_) => info!("Stopped watching subdir {:?}", &base),
+            let h = hash;
+            let sr = &sig_receiver;
+            let sl = create(&scheduler_kind, &base.to_path_buf());
+            s.spawn(move |_| match monitor(sl, base, hash, t, sr) {
+                Ok(_) => info!("Stopped watching hash.{}", &h),
                 Err(e) => {
                         error!("{:?}", e);
                         panic!("Error watching {:?}", &base);
@@ -190,7 +240,8 @@ fn main() {
             });
         }
         let r = &receiver;
-        s.spawn(move |_| process(archive, period, r));
+        let sr = &sig_receiver;
+        s.spawn(move |_| process(archiver, r, sr, cleanup));
     }) {
         error!("sarchive stopping due to error: {:?}", e);
         exit(1);
