@@ -34,7 +34,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
-use std::thread::sleep;
 use std::time::Duration;
 
 /// Representation of an entry in the Slurm job spool hash directories
@@ -82,7 +81,6 @@ pub enum Period {
 /// an Option.
 fn is_job_path(path: &Path) -> Option<(&str, &Path, String)> {
     if path.is_file() {
-        let jobfile_path = path.file_name().unwrap();
         let jobid = path.file_stem().unwrap().to_str().unwrap();
         let file_type = path.extension().unwrap().to_str().unwrap();
         return Some((jobid, path, file_type.to_string()));
