@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.4.2"
+version = "0.6.0"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2018"
 description = "Archiving tool for slurm job scripts"
@@ -16,18 +16,21 @@ travis-ci = { repository = "itkovian/sarchive" }
 coveralls = { repository = "itkovian/sarchive" }
 
 [dependencies]
+chrono = "0.4.6"
 clap = "2.33"
 crossbeam = "0.7.1"
 crossbeam-channel = "0.3.7"
 crossbeam-queue = "0.1.2"
 crossbeam-utils = "0.6.5"
-notify = "^4.0.11"
-libc = "^0.2.4"
+fern = { git = "https://github.com/itkovian/fern", branch = "reopen", features = ["reopen-03"]}
+#notify = "4.0.12"
+notify = { git = "https://github.com/passcod/notify", branch = "main" }
+libc = "0.2.58"
 log = "^0.4.6"
+reopen = "^0.3.0"
 rayon = "^1.0.3"
-fern = "0.5.8"
 syslog = "4.0.1" 
-chrono = "0.4.6"
+signal-hook = "^0.1.9"
 
 [dev-dependencies]
 tempfile = "3.0.7"
