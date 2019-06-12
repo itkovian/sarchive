@@ -19,6 +19,7 @@ This version is what we test against in CI. We also test on
 
 for both Linux and MaxOS.
 
+If you do not have [Rust](https://rustlang.org), please see [Rustup](https://rustup.rs) for installation instructions.
 
 ## Usage
 
