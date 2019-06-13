@@ -151,7 +151,7 @@ fn archive(archive_path: &Path, p: &Period, job_entry: &TorqueJobEntry) -> Resul
 fn check_and_queue(s: &Sender<TorqueJobEntry>, event: RawEvent) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
     match event {
-        RawEvent{path: Some(path), op: Ok(Op::CREATE), cookie} => {
+        RawEvent{path: Some(path), op: Ok(Op::CLOSE_WRITE), cookie} => {
             if let Some((jobid, _dirname, file_type)) = is_job_path(&path) {
                 let e = TorqueJobEntry::new(&path, jobid, &file_type);
                 s.send(e).unwrap();
