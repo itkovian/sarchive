@@ -211,7 +211,7 @@ pub fn process(
                     info!("Stopped processing entries, {} skipped", r.len());
                 } else {
                 info!("Processing {} entries, then stopping", r.len());
-                r.iter().map(|entry| archive(&archive_path, &p, &entry).unwrap());
+                for entry in r.iter() { archive(&archive_path, &p, &entry).unwrap() };
                 info!("Done processing");
                 }
                 return;
