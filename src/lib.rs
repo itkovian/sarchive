@@ -27,7 +27,7 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::Backoff;
 use log::*;
-use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Op, RawEvent, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -148,12 +148,12 @@ fn archive(archive_path: &Path, p: &Period, job_entry: &TorqueJobEntry) -> Resul
     Ok(())
 }
 
-fn check_and_queue(s: &Sender<TorqueJobEntry>, event: Event) -> Result<(), Error> {
+fn check_and_queue(s: &Sender<TorqueJobEntry>, event: RawEvent) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
-    match event.kind {
-        EventKind::Create(_) => {
-            if let Some((jobid, _dirname, file_type)) = is_job_path(&event.paths[0]) {
-                let e = TorqueJobEntry::new(&event.paths[0], jobid, &file_type);
+    match event {
+        RawEvent{path: Some(path), op: Ok(Op::CREATE), cookie} => {
+            if let Some((jobid, _dirname, file_type)) = is_job_path(&path) {
+                let e = TorqueJobEntry::new(&path, jobid, &file_type);
                 s.send(e).unwrap();
             };
         }
@@ -167,7 +167,7 @@ pub fn monitor(path: &Path, s: &Sender<TorqueJobEntry>, sigchannel: &Receiver<bo
     let (tx, rx) = unbounded();
 
     // create a platform-specific watcher
-    let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
+    let mut watcher: RecommendedWatcher = Watcher::new_immediate(tx)?;
 
     info!("Watching path {:?}", &path);
 
@@ -180,7 +180,7 @@ pub fn monitor(path: &Path, s: &Sender<TorqueJobEntry>, sigchannel: &Receiver<bo
                 return Ok(());
             },
             recv(rx) -> event => { match event {
-                Ok(e) => check_and_queue(s, e.unwrap())?,
+                Ok(e) => check_and_queue(s, e)?,
                 Err(e) => {
                     error!("Error on received event: {:?}", e);
                     break;
@@ -225,6 +225,7 @@ pub fn process(
             };}
         }
     }
+    debug!("Processing should never get here")
 }
 
 /// This function will park the thread until it is unparked and check the
