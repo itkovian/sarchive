@@ -177,6 +177,7 @@ pub fn monitor(path: &Path, s: &Sender<TorqueJobEntry>, sigchannel: &Receiver<bo
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {
+                debug!("Monitor received signal, stopping execution");
                 return Ok(());
             },
             recv(rx) -> event => { match event {
@@ -211,8 +212,10 @@ pub fn process(
                     info!("Stopped processing entries, {} skipped", r.len());
                 } else {
                 info!("Processing {} entries, then stopping", r.len());
-                for entry in r.iter() { archive(&archive_path, &p, &entry).unwrap() };
-                info!("Done processing");
+                if r.len() > 0 {
+                    for entry in r.iter() { archive(&archive_path, &p, &entry).unwrap() };
+                    info!("Done processing");
+                }
                 }
                 return;
             },
