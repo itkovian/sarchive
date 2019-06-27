@@ -35,8 +35,6 @@ use clap::{App, Arg};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
-use reopen::Reopen;
-use std::fs::{File, OpenOptions};
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -46,15 +44,6 @@ use std::sync::Arc;
 
 mod lib;
 use lib::{monitor, process, signal_handler_atomic, Period};
-
-#[inline]
-fn my_open<P: AsRef<Path>>(filename: P) -> Result<File, std::io::Error> {
-    OpenOptions::new()
-        .create(true)
-        .write(true)
-        .append(true)
-        .open(filename)
-}
 
 
 fn setup_logging(
