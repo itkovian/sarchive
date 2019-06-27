@@ -27,7 +27,8 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::Backoff;
 use log::*;
-use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::event::{Event, EventKind, CreateKind};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -179,10 +180,10 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
 /// channel so it can be processed later on.
 fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
-    match event.kind {
-        EventKind::Create(_) => {
-            if let Some((jobid, _dirname)) = is_job_path(&event.paths[0]) {
-                let e = SlurmJobEntry::new(&event.paths[0], jobid);
+    match event {
+        Event{kind: EventKind::Create(CreateKind::Folder), paths, attrs: _} => {
+            if let Some((jobid, _dirname)) = is_job_path(&paths[0]) {
+                let e = SlurmJobEntry::new(&paths[0], jobid);
                 s.send(e).unwrap();
             };
         }
@@ -205,7 +206,7 @@ pub fn monitor(
     let (tx, rx) = unbounded();
 
     // create a platform-specific watcher
-    let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
+    let mut watcher: RecommendedWatcher = Watcher::new_immediate(tx)?;
     let path = base.join(format!("hash.{}", hash));
 
     info!("Watching path {:?}", &path);
@@ -250,7 +251,9 @@ pub fn process(
                     info!("Stopped processing entries, {} skipped", r.len());
                 } else {
                 info!("Processing {} entries, then stopping", r.len());
-                r.iter().map(|entry| archive(&archive_path, &p, &entry).unwrap());
+                for entry in r.iter() {
+                    archive(&archive_path, &p, &entry).unwrap();
+                }
                 info!("Done processing");
                 }
                 return;
