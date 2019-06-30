@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.6.0"
+version = "0.7.0"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2018"
 description = "Archiving tool for slurm job scripts"
@@ -23,8 +23,8 @@ crossbeam-channel = "0.3.7"
 crossbeam-queue = "0.1.2"
 crossbeam-utils = "0.6.5"
 fern = { git = "https://github.com/itkovian/fern", branch = "reopen", features = ["reopen-03"]}
-#notify = "4.0.12"
-notify = { git = "https://github.com/passcod/notify", branch = "main" }
+#notify = "5.0.0-pre.1"
+notify = { git = "https://github.com/passcod/notify", branch = "main", commit = "0709c94" }
 libc = "0.2.58"
 log = "^0.4.6"
 reopen = "^0.3.0"

@@ -27,7 +27,8 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::Backoff;
 use log::*;
-use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::event::{Event, EventKind, CreateKind};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -35,7 +36,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
@@ -43,6 +44,8 @@ pub struct SlurmJobEntry {
     path: PathBuf,
     /// The job ID
     jobid: String,
+    /// Time of event notification and instance creation
+    moment: Instant,
 }
 
 impl SlurmJobEntry {
@@ -50,6 +53,7 @@ impl SlurmJobEntry {
         SlurmJobEntry {
             path: p.clone(),
             jobid: id.to_string(),
+            moment: Instant::now(),
         }
     }
 }
@@ -135,8 +139,13 @@ fn determine_target_path(
 /// If the directory dissapears before we found or copied the files,
 /// we panic.
 fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
-    // We wait for each file to be present
+    // Simulate the debounced event we had before. Wait two seconds after dir creation event to 
+    // have some assurance the files will have been written.
+    if slurm_job_entry.moment.elapsed().as_secs() < 2 {
+        sleep(Duration::from_millis(2000) - slurm_job_entry.moment.elapsed());
+    }
     let ten_millis = Duration::from_millis(10);
+    // We wait for each file to be present
     for filename in &["script", "environment"] {
         let fpath = slurm_job_entry.path.join(filename);
         let mut iters = 100;
@@ -179,10 +188,10 @@ fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> 
 /// channel so it can be processed later on.
 fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
-    match event.kind {
-        EventKind::Create(_) => {
-            if let Some((jobid, _dirname)) = is_job_path(&event.paths[0]) {
-                let e = SlurmJobEntry::new(&event.paths[0], jobid);
+    match event {
+        Event{kind: EventKind::Create(CreateKind::Folder), paths, attrs: _} => {
+            if let Some((jobid, _dirname)) = is_job_path(&paths[0]) {
+                let e = SlurmJobEntry::new(&paths[0], jobid);
                 s.send(e).unwrap();
             };
         }
@@ -205,7 +214,7 @@ pub fn monitor(
     let (tx, rx) = unbounded();
 
     // create a platform-specific watcher
-    let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
+    let mut watcher: RecommendedWatcher = Watcher::new_immediate(tx)?;
     let path = base.join(format!("hash.{}", hash));
 
     info!("Watching path {:?}", &path);
@@ -218,13 +227,13 @@ pub fn monitor(
             recv(sigchannel) -> b => if let Ok(true) = b  {
                 return Ok(());
             },
-            recv(rx) -> event => { match event {
-                Ok(e) => check_and_queue(s, e.unwrap())?,
-                Err(e) => {
-                    error!("Error on received event: {:?}", e);
+            recv(rx) -> event => { 
+                if let Ok(Ok(e)) = event { check_and_queue(s, e)? }
+                else {
+                    error!("Error on received event: {:?}", event);
                     break;
                 }
-            };}
+            }
         }
     }
 
@@ -250,7 +259,9 @@ pub fn process(
                     info!("Stopped processing entries, {} skipped", r.len());
                 } else {
                 info!("Processing {} entries, then stopping", r.len());
-                r.iter().map(|entry| archive(&archive_path, &p, &entry).unwrap());
+                for entry in r.iter() {
+                    archive(&archive_path, &p, &entry).unwrap();
+                }
                 info!("Done processing");
                 }
                 return;
