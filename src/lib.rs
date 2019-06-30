@@ -227,13 +227,13 @@ pub fn monitor(
             recv(sigchannel) -> b => if let Ok(true) = b  {
                 return Ok(());
             },
-            recv(rx) -> event => { match event {
-                Ok(e) => check_and_queue(s, e.unwrap())?,
-                Err(e) => {
-                    error!("Error on received event: {:?}", e);
+            recv(rx) -> event => { 
+                if let Ok(Ok(e)) = event { check_and_queue(s, e)? }
+                else {
+                    error!("Error on received event: {:?}", event);
                     break;
                 }
-            };}
+            }
         }
     }
 
