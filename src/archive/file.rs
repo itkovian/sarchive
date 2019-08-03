@@ -27,8 +27,20 @@ use std::thread::sleep;
 
 use super::{Archive};
 use super::super::slurm::{SlurmJobEntry};
-use super::super::utils::{Period};
 
+/// An enum to define a hierachy in the archive
+pub enum Period {
+    /// Leads to a YYYYMMDD subdir
+    Daily,
+    /// Leads to a YYYYMM subdir
+    Monthly,
+    /// Leads to a YYYY subdir
+    Yearly,
+    /// No subdir
+    None,
+}
+
+/// An aerchiver that writes job script info to a file
 pub struct FileArchive {
     archive_path: PathBuf,
     period: Period,
@@ -42,7 +54,6 @@ impl FileArchive {
         }
     }
 }
-
 
 impl Archive for FileArchive {
     /// Archives the files from the given SlurmJobEntry's path.

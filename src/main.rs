@@ -47,7 +47,8 @@ mod archive;
 mod slurm;
 mod utils;
 
-use utils::{monitor, process, signal_handler_atomic, Period};
+use utils::{monitor, process, signal_handler_atomic};
+use archive::file::{FileArchive, Period};
 
 
 fn setup_logging(
@@ -213,7 +214,7 @@ fn main() {
     let (sig_sender, sig_receiver) = bounded(20);
 
     let cleanup = matches.is_present("cleanup");
-    let file_archiver = archive::file::FileArchive::new(&archive.to_path_buf(), period);
+    let file_archiver = FileArchive::new(&archive.to_path_buf(), period);
 
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
