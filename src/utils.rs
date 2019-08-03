@@ -53,65 +53,6 @@ pub enum Period {
     None,
 }
 
-/// Verifies that the path metioned in the event is a that of a file that
-/// needs archival
-///
-/// This ignores the path prefix, but verifies that
-/// - the path points to a file
-/// - there is a path dir component that starts with "job."
-///
-/// For example, /var/spool/slurm/hash.3/job.01234./script is a valid path
-///
-/// We return a tuple of two strings: the job ID and the filename, wrapped in
-/// an Option.
-fn is_job_path(path: &Path) -> Option<(&str, &str)> {
-    if path.is_dir() {
-        let dirname = path.file_name().unwrap().to_str().unwrap();
-
-        if dirname.starts_with("job.") {
-            return Some((path.extension().unwrap().to_str().unwrap(), dirname));
-        };
-    }
-    debug!("{:?} is not a considered job path", &path);
-    None
-}
-
-/// Determines the target path for the slurm job file
-///
-/// The path will have the following components:
-/// - the archive path
-/// - a subdir depending on the Period
-///     - YYYY in case of a Yearly Period
-///     - YYYYMM in case of a Monthly Period
-///     - YYYYMMDD in case of a Daily Period
-/// - a file with the given filename
-fn determine_target_path(
-    archive_path: &Path,
-    p: &Period,
-    slurm_job_entry: &slurm::SlurmJobEntry,
-    filename: &str,
-) -> PathBuf {
-    let archive_subdir = match p {
-        Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
-        Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%m"))),
-        Period::Daily => Some(format!("{}", chrono::Local::now().format("%Y%m%d"))),
-        _ => None,
-    };
-    debug!("Archive subdir is {:?}", &archive_subdir);
-    match archive_subdir {
-        Some(d) => {
-            let archive_subdir_path = archive_path.join(&d);
-            if !Path::exists(&archive_subdir_path) {
-                debug!("Archive subdir {:?} does not yet exist, creating", &d);
-                create_dir_all(&archive_subdir_path).unwrap();
-            }
-            archive_subdir_path
-                .clone()
-                .join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
-        }
-        None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename)),
-    }
-}
 
 /// The check_and_queue function verifies that the inotify event pertains
 /// and actual Slurm job entry and pushes the correct information to the
@@ -120,7 +61,7 @@ fn check_and_queue(s: &Sender<slurm::SlurmJobEntry>, event: Event) -> Result<(),
     debug!("Event received: {:?}", event);
     match event {
         Event{kind: EventKind::Create(CreateKind::Folder), paths, attrs: _} => {
-            if let Some((jobid, _dirname)) = is_job_path(&paths[0]) {
+            if let Some((jobid, _dirname)) = slurm::is_job_path(&paths[0]) {
                 let e = slurm::SlurmJobEntry::new(&paths[0], jobid);
                 s.send(e).unwrap();
             };
@@ -225,100 +166,4 @@ pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Pa
         sender.send(true);
     }
     info!("Sent 20 notifications");
-}
-
-#[cfg(test)]
-mod tests {
-
-    extern crate tempfile;
-
-    use super::*;
-    use std::fs::{create_dir, read_to_string, File};
-    use std::io::Write;
-    use std::path::Path;
-    use tempfile::tempdir;
-
-    #[test]
-    fn test_is_job_path() {
-        let tdir = tempdir().unwrap();
-
-        // this should pass
-        let jobdir = tdir.path().join("job.1234");
-        let _dir = create_dir(&jobdir);
-        assert_eq!(is_job_path(&jobdir), Some(("1234", "job.1234")));
-
-        // this should fail
-        let fdir = tdir.path().join("fubar");
-        let _faildir = create_dir(&fdir);
-        assert_eq!(is_job_path(&fdir), None);
-    }
-
-    #[test]
-    fn test_determine_target_path() {
-        let tdir = tempdir().unwrap();
-
-        // create the basic archive path
-        let archive_dir = tdir.path();
-        let _dir = create_dir(&archive_dir);
-        let slurm_job_entry = slurm::SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
-
-        let p = Period::None;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
-
-        assert_eq!(target_path, archive_dir.join(format!("job.1234_foobar")));
-
-        let d = format!("{}", chrono::Local::now().format("%Y"));
-        let p = Period::Yearly;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
-
-        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
-
-        let d = format!("{}", chrono::Local::now().format("%Y%m"));
-        let p = Period::Monthly;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
-
-        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
-
-        let d = format!("{}", chrono::Local::now().format("%Y%m%d"));
-        let p = Period::Daily;
-        let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
-
-        assert_eq!(target_path, archive_dir.join(d).join("job.1234_foobar"));
-    }
-
-    #[test]
-    fn test_archive() {
-        let tdir = tempdir().unwrap();
-
-        // create the basic archive path
-        let archive_dir = tdir.path().join("archive");
-        let _dir = create_dir(&archive_dir);
-
-        // create the basic job path
-        let job_dir = tdir.path().join("job.1234");
-        let _dir = create_dir(&job_dir);
-
-        // create env and script files
-        let env_path = job_dir.join("environment");
-        let mut env = File::create(env_path).unwrap();
-        env.write(b"environment");
-
-        let job_path = job_dir.join("script");
-        let mut job = File::create(&job_path).unwrap();
-        job.write(b"job script");
-
-        let slurm_job_entry = slurm::SlurmJobEntry::new(&job_dir, "1234");
-
-        archive(&archive_dir, &Period::None, &slurm_job_entry);
-
-        assert!(Path::is_file(&archive_dir.join("job.1234_environment")));
-        assert!(Path::is_file(&archive_dir.join("job.1234_script")));
-
-        let archive_env_contents =
-            read_to_string(&archive_dir.join("job.1234_environment")).unwrap();
-        assert_eq!(&archive_env_contents, "environment");
-
-        let archive_script_contents = read_to_string(&archive_dir.join("job.1234_script")).unwrap();
-        assert_eq!(&archive_script_contents, "job script");
-    }
 }
