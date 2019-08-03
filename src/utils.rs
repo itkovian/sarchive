@@ -38,25 +38,8 @@ use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-/// Representation of an entry in the Slurm job spool hash directories
-pub struct SlurmJobEntry {
-    /// The full path to the file that needs to be archived
-    path: PathBuf,
-    /// The job ID
-    jobid: String,
-    /// Time of event notification and instance creation
-    moment: Instant,
-}
-
-impl SlurmJobEntry {
-    fn new(p: &PathBuf, id: &str) -> SlurmJobEntry {
-        SlurmJobEntry {
-            path: p.clone(),
-            jobid: id.to_string(),
-            moment: Instant::now(),
-        }
-    }
-}
+use crate::archive;
+use super::slurm;
 
 /// An enum to define a hierachy in the archive
 pub enum Period {
@@ -105,7 +88,7 @@ fn is_job_path(path: &Path) -> Option<(&str, &str)> {
 fn determine_target_path(
     archive_path: &Path,
     p: &Period,
-    slurm_job_entry: &SlurmJobEntry,
+    slurm_job_entry: &slurm::SlurmJobEntry,
     filename: &str,
 ) -> PathBuf {
     let archive_subdir = match p {
@@ -130,68 +113,15 @@ fn determine_target_path(
     }
 }
 
-/// Archives the files from the given SlurmJobEntry's path.
-///
-/// We busy wait for 1 second, sleeping for 10 ms per turn for
-/// the environment and script files to appear.
-/// If the files cannot be found after that tine, we output a warning
-/// and return without copying.
-/// If the directory dissapears before we found or copied the files,
-/// we panic.
-fn archive(archive_path: &Path, p: &Period, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
-    // Simulate the debounced event we had before. Wait two seconds after dir creation event to 
-    // have some assurance the files will have been written.
-    if slurm_job_entry.moment.elapsed().as_secs() < 2 {
-        sleep(Duration::from_millis(2000) - slurm_job_entry.moment.elapsed());
-    }
-    let ten_millis = Duration::from_millis(10);
-    // We wait for each file to be present
-    for filename in &["script", "environment"] {
-        let fpath = slurm_job_entry.path.join(filename);
-        let mut iters = 100;
-        while !Path::exists(&fpath) && iters > 0 {
-            debug!("Waiting for {:?}", fpath);
-            sleep(ten_millis);
-            if !Path::exists(&slurm_job_entry.path) {
-                error!("Job directory {:?} no longer exists", &slurm_job_entry.path);
-                panic!("path not found");
-            }
-            iters -= 1;
-        }
-        if iters == 0 {
-            warn!("Cannot make copy of {:?}", fpath);
-            continue;
-        }
-
-        let target_path = determine_target_path(&archive_path, &p, &slurm_job_entry, &filename);
-
-        match copy(&fpath, &target_path) {
-            Ok(bytes) => info!(
-                "copied {} bytes from {:?} to {:?}",
-                bytes, &fpath, &target_path
-            ),
-            Err(e) => {
-                error!(
-                    "Copy of {:?} to {:?} failed: {:?}",
-                    &slurm_job_entry.path, &target_path, e
-                );
-                return Err(e);
-            }
-        };
-    }
-
-    Ok(())
-}
-
 /// The check_and_queue function verifies that the inotify event pertains
 /// and actual Slurm job entry and pushes the correct information to the
 /// channel so it can be processed later on.
-fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error> {
+fn check_and_queue(s: &Sender<slurm::SlurmJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
     match event {
         Event{kind: EventKind::Create(CreateKind::Folder), paths, attrs: _} => {
             if let Some((jobid, _dirname)) = is_job_path(&paths[0]) {
-                let e = SlurmJobEntry::new(&paths[0], jobid);
+                let e = slurm::SlurmJobEntry::new(&paths[0], jobid);
                 s.send(e).unwrap();
             };
         }
@@ -208,7 +138,7 @@ fn check_and_queue(s: &Sender<SlurmJobEntry>, event: Event) -> Result<(), Error>
 pub fn monitor(
     base: &Path,
     hash: u8,
-    s: &Sender<SlurmJobEntry>,
+    s: &Sender<slurm::SlurmJobEntry>,
     sigchannel: &Receiver<bool>,
 ) -> notify::Result<()> {
     let (tx, rx) = unbounded();
@@ -227,7 +157,7 @@ pub fn monitor(
             recv(sigchannel) -> b => if let Ok(true) = b  {
                 return Ok(());
             },
-            recv(rx) -> event => { 
+            recv(rx) -> event => {
                 if let Ok(Ok(e)) = event { check_and_queue(s, e)? }
                 else {
                     error!("Error on received event: {:?}", event);
@@ -240,14 +170,16 @@ pub fn monitor(
     Ok(())
 }
 
+
+
+
 /// The process function consumes job entries and call the archive function for each
 /// received entry.
 /// At the same time, it also checks if there is an incoming notification that it should
 /// stop processing. Upon receipt, it will cease operations immediately.
 pub fn process(
-    archive_path: &Path,
-    p: Period,
-    r: &Receiver<SlurmJobEntry>,
+    archiver: &archive::Archive,
+    r: &Receiver<slurm::SlurmJobEntry>,
     sigchannel: &Receiver<bool>,
     cleanup: bool,
 ) {
@@ -260,14 +192,14 @@ pub fn process(
                 } else {
                 info!("Processing {} entries, then stopping", r.len());
                 for entry in r.iter() {
-                    archive(&archive_path, &p, &entry).unwrap();
+                    archiver.archive(&entry).unwrap();
                 }
                 info!("Done processing");
                 }
                 return;
             },
             recv(r) -> entry => { match entry {
-                Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
+                Ok(slurm_job_entry) => archiver.archive(&slurm_job_entry),
                 Err(_) => {
                     error!("Error on receiving SlurmJobEntry info");
                     break;
@@ -328,7 +260,7 @@ mod tests {
         // create the basic archive path
         let archive_dir = tdir.path();
         let _dir = create_dir(&archive_dir);
-        let slurm_job_entry = SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
+        let slurm_job_entry = slurm::SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
 
         let p = Period::None;
         let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
@@ -375,7 +307,7 @@ mod tests {
         let mut job = File::create(&job_path).unwrap();
         job.write(b"job script");
 
-        let slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234");
+        let slurm_job_entry = slurm::SlurmJobEntry::new(&job_dir, "1234");
 
         archive(&archive_dir, &Period::None, &slurm_job_entry);
 
