@@ -41,3 +41,52 @@ impl SlurmJobEntry {
         }
     }
 }
+
+/// Verifies that the path metioned in the event is a that of a file that
+/// needs archival
+///
+/// This ignores the path prefix, but verifies that
+/// - the path points to a file
+/// - there is a path dir component that starts with "job."
+///
+/// For example, /var/spool/slurm/hash.3/job.01234./script is a valid path
+///
+/// We return a tuple of two strings: the job ID and the filename, wrapped in
+/// an Option.
+pub fn is_job_path(path: &Path) -> Option<(&str, &str)> {
+    if path.is_dir() {
+        let dirname = path.file_name().unwrap().to_str().unwrap();
+
+        if dirname.starts_with("job.") {
+            return Some((path.extension().unwrap().to_str().unwrap(), dirname));
+        };
+    }
+    debug!("{:?} is not a considered job path", &path);
+    None
+}
+
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use std::fs::{create_dir, read_to_string, File};
+    use tempfile::tempdir;
+
+   #[test]
+    fn test_is_job_path() {
+        let tdir = tempdir().unwrap();
+
+        // this should pass
+        let jobdir = tdir.path().join("job.1234");
+        let _dir = create_dir(&jobdir);
+        assert_eq!(is_job_path(&jobdir), Some(("1234", "job.1234")));
+
+        // this should fail
+        let fdir = tdir.path().join("fubar");
+        let _faildir = create_dir(&fdir);
+        assert_eq!(is_job_path(&fdir), None);
+    }
+
+}

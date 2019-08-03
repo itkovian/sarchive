@@ -145,26 +145,13 @@ mod tests {
 
     extern crate tempfile;
 
-    use super::*;
     use std::fs::{create_dir, read_to_string, File};
     use std::io::Write;
     use std::path::Path;
     use tempfile::tempdir;
 
-    #[test]
-    fn test_is_job_path() {
-        let tdir = tempdir().unwrap();
-
-        // this should pass
-        let jobdir = tdir.path().join("job.1234");
-        let _dir = create_dir(&jobdir);
-        assert_eq!(is_job_path(&jobdir), Some(("1234", "job.1234")));
-
-        // this should fail
-        let fdir = tdir.path().join("fubar");
-        let _faildir = create_dir(&fdir);
-        assert_eq!(is_job_path(&fdir), None);
-    }
+    use super::*;
+    use super::super::*;
 
     #[test]
     fn test_determine_target_path() {
@@ -173,7 +160,7 @@ mod tests {
         // create the basic archive path
         let archive_dir = tdir.path();
         let _dir = create_dir(&archive_dir);
-        let slurm_job_entry = slurm::SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
+        let slurm_job_entry = SlurmJobEntry::new(&PathBuf::from("/tmp/some/job/path"), "1234");
 
         let p = Period::None;
         let target_path = determine_target_path(&archive_dir, &p, &slurm_job_entry, "foobar");
@@ -200,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn test_archive() {
+    fn test_file_archive() {
         let tdir = tempdir().unwrap();
 
         // create the basic archive path
@@ -220,9 +207,10 @@ mod tests {
         let mut job = File::create(&job_path).unwrap();
         job.write(b"job script");
 
-        let slurm_job_entry = slurm::SlurmJobEntry::new(&job_dir, "1234");
+        let slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234");
 
-        archive(&archive_dir, &Period::None, &slurm_job_entry);
+        let file_archiver = FileArchive::new(&archive_dir, Period::None);
+        file_archiver.archive(&slurm_job_entry);
 
         assert!(Path::is_file(&archive_dir.join("job.1234_environment")));
         assert!(Path::is_file(&archive_dir.join("job.1234_script")));
