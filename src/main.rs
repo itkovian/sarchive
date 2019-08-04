@@ -23,8 +23,6 @@ extern crate chrono;
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
-extern crate elastic;
-#[macro_use] extern crate elastic_derive;
 extern crate fern;
 extern crate libc;
 #[macro_use] extern crate log;
