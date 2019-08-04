@@ -23,10 +23,11 @@ extern crate chrono;
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
+extern crate elastic;
+#[macro_use] extern crate elastic_derive;
 extern crate fern;
 extern crate libc;
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 extern crate notify;
 extern crate reopen;
 extern crate syslog;
@@ -42,8 +43,11 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 
-mod lib;
-use lib::{monitor, process, signal_handler_atomic, Period};
+mod archive;
+mod slurm;
+mod utils;
+
+use utils::{monitor, process, signal_handler_atomic, Period};
 
 
 fn setup_logging(
@@ -66,7 +70,7 @@ fn setup_logging(
         Some(filename) => {
             let r = fern::log_reopen(&PathBuf::from(filename), Some(libc::SIGHUP)).unwrap();
             base_config.chain(r)
-        }, 
+        },
         None => base_config.chain(std::io::stdout())
     }.apply()
 }
@@ -209,6 +213,7 @@ fn main() {
     let (sig_sender, sig_receiver) = bounded(20);
 
     let cleanup = matches.is_present("cleanup");
+    let file_archiver = archive::file::FileArchive::new(&archive.to_path_buf(), period);
 
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
@@ -232,7 +237,7 @@ fn main() {
         }
         let r = &receiver;
         let sr = &sig_receiver;
-        s.spawn(move |_| process(archive, period, r, sr, cleanup));
+        s.spawn(move |_| process(&file_archiver, r, sr, cleanup));
     }) {
         error!("sarchive stopping due to error: {:?}", e);
         exit(1);
