@@ -26,7 +26,7 @@ use std::time::{Duration, Instant};
 use std::thread::sleep;
 
 use super::{Archive};
-use super::super::slurm::{SlurmJobEntry};
+use crate::slurm::{SlurmJobEntry};
 
 /// An enum to define a hierachy in the archive
 pub enum Period {

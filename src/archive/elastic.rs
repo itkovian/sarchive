@@ -20,13 +20,29 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-pub mod elastic;
-pub mod file;
-
 use std::io::Error;
-use super::slurm;
+use super::Archive;
+use crate::slurm::{SlurmJobEntry};
 
-/// The Archive trait should be implemented by every backend.
-pub trait Archive {
-    fn archive(&self, slurm_job_entry: &slurm::SlurmJobEntry) -> Result<(), Error>;
+pub struct ElasticArchive {
+    host: String,
+    port: u16,
+}
+
+impl ElasticArchive {
+    pub fn new(host: &str, port: u16) -> Self {
+        ElasticArchive {
+            host: host.to_owned(),
+            port: port,
+        }
+    }
+}
+
+
+impl Archive for ElasticArchive {
+
+    fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+        Ok(())
+    }
+
 }
