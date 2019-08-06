@@ -20,20 +20,26 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 use std::io::Error;
 use super::Archive;
 use crate::slurm::{SlurmJobEntry};
 
+use elastic::http::header::{self, AUTHORIZATION, HeaderValue};
+use elastic::client::{AsyncClient, AsyncClientBuilder};
+
+
 pub struct ElasticArchive {
-    host: String,
-    port: u16,
+    client: AsyncClient
 }
 
 impl ElasticArchive {
     pub fn new(host: &str, port: u16) -> Self {
         ElasticArchive {
-            host: host.to_owned(),
-            port: port,
+            client: AsyncClientBuilder::new()
+                .sniff_nodes(format!("http://{host}:{port}", host=host, port=port))  // TODO: use a pool for serde
+                .build().unwrap(),
         }
     }
 }
@@ -42,7 +48,18 @@ impl ElasticArchive {
 impl Archive for ElasticArchive {
 
     fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+
+
+
         Ok(())
     }
 
+}
+
+
+#[derive(Serialize, Deserialize, ElasticType)]
+struct JobInfo {
+    pub id: String,
+    pub script: String,
+    pub environment: HashMap<String, String>,
 }

@@ -30,6 +30,8 @@ notify = { git = "https://github.com/passcod/notify", branch = "main", commit = 
 libc = "0.2.60"
 log = "^0.4"
 reopen = "^0.3.0"
+serde = "~1"
+serde_derive = "~1"
 syslog = "4.0.1"
 signal-hook = "^0.1.10"
 

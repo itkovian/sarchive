@@ -27,6 +27,6 @@ use std::io::Error;
 use super::slurm;
 
 /// The Archive trait should be implemented by every backend.
-pub trait Archive {
+pub trait Archive: Send {
     fn archive(&self, slurm_job_entry: &slurm::SlurmJobEntry) -> Result<(), Error>;
 }
