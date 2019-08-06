@@ -23,6 +23,9 @@ extern crate chrono;
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
+extern crate elastic;
+#[macro_use]
+extern crate elastic_derive;
 extern crate fern;
 extern crate libc;
 #[macro_use] extern crate log;
@@ -46,8 +49,9 @@ mod slurm;
 mod utils;
 
 use utils::{monitor, process, signal_handler_atomic};
+use archive::Archive;
 use archive::file::{FileArchive, Period};
-
+use archive::elastic::{ElasticArchive};
 
 fn setup_logging(
     level_filter: log::LevelFilter,
@@ -162,44 +166,61 @@ fn main() {
         Ok(_) => (),
         Err(e) => panic!("Cannot set up logging: {:?}", e),
     };
-
-    let period = match matches.value_of("period") {
-        Some("yearly") => Period::Yearly,
-        Some("monthly") => Period::Monthly,
-        Some("daily") => Period::Daily,
-        _ => Period::None,
-    };
-
     let base = Path::new(
         matches
             .value_of("spool")
             .expect("You must provide the location of the hash dirs."),
     );
-    let archive = Path::new(
-        matches
-            .value_of("archive")
-            .expect("You must provide the location of the archive"),
-    );
-
-    info!(
-        "sarchive starting. Watching hash dirs in {:?}. Archiving under {:?}.",
-        &base, &archive
-    );
-
     if !base.is_dir() {
         error!("Provided base {:?} is not a valid directory", base);
         exit(1);
     }
-    if !archive.is_dir() {
-        warn!(
-            "Provided archive {:?} is not a valid directory, creating it.",
-            &archive
-        );
-        if let Err(e) = create_dir_all(&archive) {
-            error!("Unable to create archive at {:?}. {}", &archive, e);
+
+    let archiver: Box<Archive> = match matches.subcommand() {
+        ("file", Some(command_matches)) => {
+            let archive = Path::new(
+                command_matches
+                    .value_of("archive")
+                    .expect("You must provide the location of the archive"),
+            );
+
+            if !archive.is_dir() {
+                warn!(
+                    "Provided archive {:?} is not a valid directory, creating it.",
+                    &archive
+                );
+                if let Err(e) = create_dir_all(&archive) {
+                    error!("Unable to create archive at {:?}. {}", &archive, e);
+                    exit(1);
+                }
+            };
+
+            let period = match command_matches.value_of("period") {
+                Some("yearly") => Period::Yearly,
+                Some("monthly") => Period::Monthly,
+                Some("daily") => Period::Daily,
+                _ => Period::None,
+            };
+
+            Box::new(FileArchive::new(&archive.to_path_buf(), period))
+        },
+        ("elastic", Some(run_matches)) => {
+            Box::new(ElasticArchive::new(
+                run_matches.value_of("host").unwrap(),
+                run_matches.value_of("port").unwrap().parse::<u16>().unwrap()
+            ))
+        },
+        (&_, _) => {
+            error!("No matching subcommand used, exiting");
             exit(1);
         }
-    }
+    };
+
+    info!(
+        "sarchive starting. Watching hash dirs in {:?}.",
+        &base
+    );
+
 
     let notification = Arc::new(AtomicBool::new(false));
     let parker = Parker::new();
@@ -230,7 +251,6 @@ fn main() {
     let (sig_sender, sig_receiver) = bounded(20);
 
     let cleanup = matches.is_present("cleanup");
-    let file_archiver = FileArchive::new(&archive.to_path_buf(), period);
 
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
@@ -254,7 +274,7 @@ fn main() {
         }
         let r = &receiver;
         let sr = &sig_receiver;
-        s.spawn(move |_| process(&file_archiver, r, sr, cleanup));
+        s.spawn(move |_| process(&archiver, r, sr, cleanup));
     }) {
         error!("sarchive stopping due to error: {:?}", e);
         exit(1);
