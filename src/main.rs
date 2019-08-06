@@ -146,12 +146,14 @@ fn main() {
                 Arg::with_name("host")
                     .long("host")
                     .takes_value(true)
+                    .default_value("localhost")
                     .help("The hostname of the ElasticSearch server")
             )
             .arg(
-                Arg::with_name("post")
+                Arg::with_name("port")
                     .long("port")
                     .takes_value(true)
+                    .default_value("9200")
                     .help("The port of the ElasticSearch service")
             )
         )
@@ -204,7 +206,8 @@ fn main() {
 
             Box::new(FileArchive::new(&archive.to_path_buf(), period))
         },
-        ("elastic", Some(run_matches)) => {
+        ("elasticsearch", Some(run_matches)) => {
+            info!("Using ElasticSearch archival");
             Box::new(ElasticArchive::new(
                 run_matches.value_of("host").unwrap(),
                 run_matches.value_of("port").unwrap().parse::<u16>().unwrap()
