@@ -30,7 +30,7 @@ extern crate notify;
 extern crate reopen;
 extern crate syslog;
 
-use clap::{App, Arg};
+use clap::{App, Arg, SubCommand};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
@@ -99,25 +99,6 @@ fn main() {
                 .help("Log at DEBUG level.")
         )
         .arg(
-            Arg::with_name("logfile")
-                .long("logfile")
-                .short("l")
-                .takes_value(true)
-                .help("Log file name.")
-        )
-        .arg(
-            Arg::with_name("period")
-                .long("period")
-                .short("p")
-                .takes_value(true)
-                .possible_value("yearly")
-                .possible_value("monthly")
-                .possible_value("daily")
-                .help(
-                    "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
-                )
-        )
-        .arg(
             Arg::with_name("cleanup")
                 .long("cleanup")
                 .help(
@@ -132,6 +113,43 @@ fn main() {
                 .help(
                     "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
                 )
+        )
+        .subcommand(SubCommand::with_name("file")
+            .about("Archive to the filesystem")
+            .arg(
+                Arg::with_name("logfile")
+                    .long("logfile")
+                    .short("l")
+                    .takes_value(true)
+                    .help("Log file name.")
+            )
+            .arg(
+                Arg::with_name("period")
+                    .long("period")
+                    .short("p")
+                    .takes_value(true)
+                    .possible_value("yearly")
+                    .possible_value("monthly")
+                    .possible_value("daily")
+                    .help(
+                        "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
+                    )
+            )
+        )
+        .subcommand(SubCommand::with_name("elasticsearch")
+            .about("Archive to ElasticSearch")
+            .arg(
+                Arg::with_name("host")
+                    .long("host")
+                    .takes_value(true)
+                    .help("The hostname of the ElasticSearch server")
+            )
+            .arg(
+                Arg::with_name("post")
+                    .long("port")
+                    .takes_value(true)
+                    .help("The port of the ElasticSearch service")
+            )
         )
         .get_matches();
 
