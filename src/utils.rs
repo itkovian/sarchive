@@ -29,14 +29,11 @@ use crossbeam_utils::Backoff;
 use log::*;
 use notify::event::{Event, EventKind, CreateKind};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use std::fs::{copy, create_dir_all};
 use std::io::Error;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
 
 use crate::archive;
 use super::slurm;
@@ -119,7 +116,7 @@ pub fn monitor(
 /// At the same time, it also checks if there is an incoming notification that it should
 /// stop processing. Upon receipt, it will cease operations immediately.
 pub fn process(
-    archiver: &Box<archive::Archive>,
+    archiver: &Box<dyn archive::Archive>,
     r: &Receiver<slurm::SlurmJobEntry>,
     sigchannel: &Receiver<bool>,
     cleanup: bool,

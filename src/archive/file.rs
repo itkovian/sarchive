@@ -22,7 +22,7 @@ SOFTWARE.
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::thread::sleep;
 
 use super::{Archive};
