@@ -20,26 +20,53 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+//use futures::future::Future;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::io::Error;
 use super::Archive;
 use crate::slurm::{SlurmJobEntry};
 
-use elastic::http::header::{self, AUTHORIZATION, HeaderValue};
-use elastic::client::{AsyncClient, AsyncClientBuilder};
+//use elastic::http::header::{self, AUTHORIZATION, HeaderValue};
+use elastic::client::{SyncClient, SyncClientBuilder};
 
 
 pub struct ElasticArchive {
-    client: AsyncClient
+    client: SyncClient,
+    index: String
 }
 
+
+fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
+
+    /*let body = json!({
+        "mappings": {
+            JobInfo::partial_static_index(): JobInfo::partial_index_mapping()
+        }
+    });
+    */
+    client.index(index_name)
+        .create()
+     //    .body(body.to_string())
+        .send().unwrap();
+
+    Ok(())
+}
+
+
 impl ElasticArchive {
-    pub fn new(host: &str, port: u16) -> Self {
-        ElasticArchive {
-            client: AsyncClientBuilder::new()
+    pub fn new(host: &str, port: u16, index: String) -> Self {
+        let client = SyncClientBuilder::new()
                 .sniff_nodes(format!("http://{host}:{port}", host=host, port=port))  // TODO: use a pool for serde
-                .build().unwrap(),
+                .build().unwrap();
+
+        let response = client.index(index.to_owned()).exists().send().unwrap();
+        if !response.exists() {
+            create_index(&client, index.to_owned());
+        }
+        ElasticArchive {
+            client: client,
+            index: index.to_owned(),
         }
     }
 }
@@ -49,7 +76,20 @@ impl Archive for ElasticArchive {
 
     fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
 
+        info!("Yup, got some {:?}", slurm_job_entry.jobid);
 
+        let _res = self.client.document::<JobInfo>()
+            .put_mapping()
+            .send().unwrap();
+
+        let doc = JobInfo {
+            id: slurm_job_entry.jobid.to_owned(),
+            script: String::from("test"),
+            environment: HashMap::new(),
+        };
+        let _res = self.client.document()
+            .index(doc)
+            .send().unwrap();
 
         Ok(())
     }
@@ -59,6 +99,7 @@ impl Archive for ElasticArchive {
 
 #[derive(Serialize, Deserialize, ElasticType)]
 struct JobInfo {
+    #[elastic(id)]
     pub id: String,
     pub script: String,
     pub environment: HashMap<String, String>,

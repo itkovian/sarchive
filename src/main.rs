@@ -31,6 +31,7 @@ extern crate libc;
 #[macro_use] extern crate log;
 extern crate notify;
 extern crate reopen;
+#[macro_use] extern crate serde_json;
 extern crate syslog;
 
 use clap::{App, Arg, SubCommand};
@@ -156,6 +157,13 @@ fn main() {
                     .default_value("9200")
                     .help("The port of the ElasticSearch service")
             )
+            .arg(
+                Arg::with_name("index")
+                    .long("index")
+                    .takes_value(true)
+                    .required(true)
+                    .help("The index where the documents will be put")
+            )
         )
         .get_matches();
 
@@ -178,7 +186,7 @@ fn main() {
         exit(1);
     }
 
-    let archiver: Box<Archive> = match matches.subcommand() {
+    let archiver: Box<dyn Archive> = match matches.subcommand() {
         ("file", Some(command_matches)) => {
             let archive = Path::new(
                 command_matches
@@ -210,7 +218,8 @@ fn main() {
             info!("Using ElasticSearch archival");
             Box::new(ElasticArchive::new(
                 run_matches.value_of("host").unwrap(),
-                run_matches.value_of("port").unwrap().parse::<u16>().unwrap()
+                run_matches.value_of("port").unwrap().parse::<u16>().unwrap(),
+                run_matches.value_of("index").unwrap().to_owned()
             ))
         },
         (&_, _) => {
