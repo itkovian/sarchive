@@ -19,6 +19,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+use std::collections::HashMap;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -42,11 +44,11 @@ impl SlurmJobEntry {
     }
 
     pub fn read_script(&self) -> String {
-        String::from("script contents")
+        fs::read_to_string(self.path.join("script")).expect(&format!("Could not read file {:?}/script", self.path))
     }
 
-    pub fn read_env(&self) -> String {
-        String::from("env contents")
+    pub fn read_env(&self) -> HashMap<&str, &str> {
+        HashMap::new()
     }
 }
 

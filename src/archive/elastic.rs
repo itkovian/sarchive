@@ -96,7 +96,7 @@ impl Archive for ElasticArchive {
 
         let doc = JobInfo {
             id: slurm_job_entry.jobid.to_owned(),
-            script: String::from("test"),
+            script: script,
             environment: HashMap::new(),
         };
         let _res = self.client.document()
