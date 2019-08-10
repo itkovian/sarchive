@@ -40,6 +40,14 @@ impl SlurmJobEntry {
             moment: Instant::now(),
         }
     }
+
+    pub fn read_script(&self) -> String {
+        String::from("script contents")
+    }
+
+    pub fn read_env(&self) -> String {
+        String::from("env contents")
+    }
 }
 
 /// Verifies that the path metioned in the event is a that of a file that

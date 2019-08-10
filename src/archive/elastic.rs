@@ -24,6 +24,7 @@ SOFTWARE.
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::io::Error;
+use std::process::exit;
 use super::Archive;
 use crate::slurm::{SlurmJobEntry};
 
@@ -60,10 +61,22 @@ impl ElasticArchive {
                 .sniff_nodes(format!("http://{host}:{port}", host=host, port=port))  // TODO: use a pool for serde
                 .build().unwrap();
 
-        let response = client.index(index.to_owned()).exists().send().unwrap();
-        if !response.exists() {
-            create_index(&client, index.to_owned());
+        // We create the index if it does not exist
+        if let Ok(response) = client.index(index.to_owned()).exists().send() {
+            if !response.exists() {
+                create_index(&client, index.to_owned());
+            }
+        } else {
+            error!("Cannot check if index exists. Quitting.");
+            exit(1);
         }
+
+        // Put the mapping once at the start of the application
+        if let Err(e) = client.document::<JobInfo>().put_mapping().send() {
+            error!("Cannot put mapping for jobinfo document");
+            exit(1);
+        }
+
         ElasticArchive {
             client: client,
             index: index.to_owned(),
@@ -76,11 +89,10 @@ impl Archive for ElasticArchive {
 
     fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
 
-        info!("Yup, got some {:?}", slurm_job_entry.jobid);
+        debug!("ES archiver, received an entry for job ID {:?}", slurm_job_entry.jobid);
 
-        let _res = self.client.document::<JobInfo>()
-            .put_mapping()
-            .send().unwrap();
+        let script = slurm_job_entry.read_script();
+        let env = slurm_job_entry.read_env();
 
         let doc = JobInfo {
             id: slurm_job_entry.jobid.to_owned(),
