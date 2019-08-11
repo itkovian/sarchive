@@ -16,7 +16,7 @@ travis-ci = { repository = "itkovian/sarchive" }
 coveralls = { repository = "itkovian/sarchive" }
 
 [dependencies]
-chrono = "0.4.7"
+chrono = { version = "0.4.7", features = ["serde"] }
 clap = "2.33"
 crossbeam = "0.7.2"
 crossbeam-channel = "0.3.9"
