@@ -47,8 +47,21 @@ impl SlurmJobEntry {
         fs::read_to_string(self.path.join("script")).expect(&format!("Could not read file {:?}/script", self.path))
     }
 
-    pub fn read_env(&self) -> HashMap<&str, &str> {
-        HashMap::new()
+    pub fn read_env(&self) -> HashMap<String, String> {
+        let s = fs::read_to_string(self.path.join("environment")).expect(&format!("Could not read file {:?}/environment", self.path));
+
+        s.split('\0')
+            .filter(|s| s.len() > 0)
+            .map(|s| {
+                let ps: Vec<_> = s.split('=').collect();
+                if ps.len() == 2 {
+                    (ps[0].to_owned(), ps[1].to_owned())
+                } else {
+                    (s.to_owned(), String::from(""))
+                }
+            })
+            .collect()
+
     }
 }
 
