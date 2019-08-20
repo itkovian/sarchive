@@ -38,19 +38,6 @@ use std::sync::Arc;
 use crate::archive;
 use super::slurm;
 
-/// An enum to define a hierachy in the archive
-pub enum Period {
-    /// Leads to a YYYYMMDD subdir
-    Daily,
-    /// Leads to a YYYYMM subdir
-    Monthly,
-    /// Leads to a YYYY subdir
-    Yearly,
-    /// No subdir
-    None,
-}
-
-
 /// The check_and_queue function verifies that the inotify event pertains
 /// and actual Slurm job entry and pushes the correct information to the
 /// channel so it can be processed later on.

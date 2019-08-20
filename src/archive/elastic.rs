@@ -20,7 +20,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#![recursion_limit="128"]
+
 //use futures::future::Future;
+use chrono::{DateTime, Local, Utc};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::io::Error;
@@ -37,18 +40,44 @@ pub struct ElasticArchive {
     index: String
 }
 
-
 fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
 
-    /*let body = json!({
+    let body = json!({
         "mappings": {
-            JobInfo::partial_static_index(): JobInfo::partial_index_mapping()
+            "dynamic": false,
+            "properties": {
+                "environment": {
+                    "type": "object",
+                    "dynamic": true,
+                },
+                "id": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                        }
+                    }
+                },
+                "timestamp": {
+                    "type": "date"
+                },
+                "script": {
+                    "type": "text",
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 256
+                        }
+                    }
+                }
+            }
         }
     });
-    */
+
     client.index(index_name)
         .create()
-     //    .body(body.to_string())
+        .body(body.to_string())
         .send().unwrap();
 
     Ok(())
@@ -72,10 +101,10 @@ impl ElasticArchive {
         }
 
         // Put the mapping once at the start of the application
-        if let Err(e) = client.document::<JobInfo>().put_mapping().send() {
-            error!("Cannot put mapping for jobinfo document");
-            exit(1);
-        }
+        //if let Err(e) = client.document::<JobInfo>().put_mapping().send() {
+        //    error!("Cannot put mapping for jobinfo document");
+        //    exit(1);
+        //}
 
         ElasticArchive {
             client: client,
@@ -96,6 +125,7 @@ impl Archive for ElasticArchive {
 
         let doc = JobInfo {
             id: slurm_job_entry.jobid.to_owned(),
+            timestamp: Utc::now(),
             script: script,
             environment: env,
         };
@@ -113,6 +143,7 @@ impl Archive for ElasticArchive {
 struct JobInfo {
     #[elastic(id)]
     pub id: String,
+    pub timestamp: DateTime<Utc>,
     pub script: String,
     pub environment: HashMap<String, String>,
 }
