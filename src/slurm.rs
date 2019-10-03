@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
@@ -65,8 +65,6 @@ pub fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     None
 }
 
-
-
 #[cfg(test)]
 mod tests {
 
@@ -74,7 +72,7 @@ mod tests {
     use std::fs::{create_dir, read_to_string, File};
     use tempfile::tempdir;
 
-   #[test]
+    #[test]
     fn test_is_job_path() {
         let tdir = tempdir().unwrap();
 
@@ -88,5 +86,4 @@ mod tests {
         let _faildir = create_dir(&fdir);
         assert_eq!(is_job_path(&fdir), None);
     }
-
 }

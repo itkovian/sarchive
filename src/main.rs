@@ -25,7 +25,8 @@ extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 extern crate fern;
 extern crate libc;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 extern crate notify;
 extern crate reopen;
 extern crate syslog;
@@ -45,9 +46,8 @@ mod archive;
 mod slurm;
 mod utils;
 
-use utils::{monitor, process, signal_handler_atomic};
 use archive::file::{FileArchive, Period};
-
+use utils::{monitor, process, signal_handler_atomic};
 
 fn setup_logging(
     level_filter: log::LevelFilter,
@@ -69,9 +69,10 @@ fn setup_logging(
         Some(filename) => {
             let r = fern::log_reopen(&PathBuf::from(filename), Some(libc::SIGHUP)).unwrap();
             base_config.chain(r)
-        },
-        None => base_config.chain(std::io::stdout())
-    }.apply()
+        }
+        None => base_config.chain(std::io::stdout()),
+    }
+    .apply()
 }
 
 fn main() {
@@ -191,22 +192,28 @@ fn main() {
     let u1 = unparker.clone();
     let n1 = Arc::clone(&notification);
     unsafe {
-        signal_hook::register(signal_hook::SIGTERM, move || {
+        if let Err(e) = signal_hook::register(signal_hook::SIGTERM, move || {
             info!("Received SIGTERM");
             n1.store(true, SeqCst);
             u1.unpark()
-        })
+        }) {
+            error!("Cannot register signal for SIGTERM: {:?}", e);
+            exit(1);
+        }
     };
 
     info!("Registering signal handler for SIGINT");
     let u2 = unparker.clone();
     let n2 = Arc::clone(&notification);
     unsafe {
-        signal_hook::register(signal_hook::SIGINT, move || {
+        if let Err(e) = signal_hook::register(signal_hook::SIGINT, move || {
             info!("Received SIGINT");
             n2.store(true, SeqCst);
             u2.unpark()
-        })
+        }) {
+            error!("Cannot register signal for SIGTERM: {:?})", e);
+            exit(1);
+        }
     };
 
     let (sig_sender, sig_receiver) = bounded(20);
