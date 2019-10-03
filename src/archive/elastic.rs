@@ -20,9 +20,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#![recursion_limit="128"]
-
-//use futures::future::Future;
 use chrono::{DateTime, Local, Utc};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
