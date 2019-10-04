@@ -22,11 +22,11 @@ SOFTWARE.
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 use std::thread::sleep;
+use std::time::Duration;
 
-use super::{Archive};
-use crate::slurm::{SlurmJobEntry};
+use super::super::slurm::SlurmJobEntry;
+use super::Archive;
 
 /// An enum to define a hierachy in the archive
 pub enum Period {
@@ -111,7 +111,6 @@ impl Archive for FileArchive {
 
         Ok(())
     }
-
 }
 
 /// Determines the target path for the slurm job file
@@ -161,8 +160,8 @@ mod tests {
     use std::path::Path;
     use tempfile::tempdir;
 
-    use super::*;
     use super::super::*;
+    use super::*;
 
     #[test]
     fn test_determine_target_path() {

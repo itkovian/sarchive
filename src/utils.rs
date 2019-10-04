@@ -27,7 +27,7 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::Backoff;
 use log::*;
-use notify::event::{Event, EventKind, CreateKind};
+use notify::event::{CreateKind, Event, EventKind};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::io::Error;
 use std::path::Path;
@@ -35,23 +35,24 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 
-use crate::archive;
 use super::slurm;
+use crate::archive;
 
 /// The check_and_queue function verifies that the inotify event pertains
 /// and actual Slurm job entry and pushes the correct information to the
 /// channel so it can be processed later on.
 fn check_and_queue(s: &Sender<slurm::SlurmJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
-    match event {
-        Event{kind: EventKind::Create(CreateKind::Folder), paths, attrs: _} => {
-            if let Some((jobid, _dirname)) = slurm::is_job_path(&paths[0]) {
-                let e = slurm::SlurmJobEntry::new(&paths[0], jobid);
-                s.send(e).unwrap();
-            };
-        }
-        // We ignore all other events
-        _ => (),
+    if let Event {
+        kind: EventKind::Create(CreateKind::Folder),
+        paths,
+        ..
+    } = event
+    {
+        if let Some((jobid, _dirname)) = slurm::is_job_path(&paths[0]) {
+            let e = slurm::SlurmJobEntry::new(&paths[0], jobid);
+            s.send(e).unwrap();
+        };
     }
     Ok(())
 }
@@ -77,6 +78,7 @@ pub fn monitor(
     if let Err(e) = watcher.watch(&path, RecursiveMode::NonRecursive) {
         return Err(e);
     }
+    #[allow(clippy::zero_ptr, clippy::drop_copy)]
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {
@@ -95,9 +97,6 @@ pub fn monitor(
     Ok(())
 }
 
-
-
-
 /// The process function consumes job entries and call the archive function for each
 /// received entry.
 /// At the same time, it also checks if there is an incoming notification that it should
@@ -109,6 +108,7 @@ pub fn process(
     cleanup: bool,
 ) {
     info!("Start processing events");
+    #[allow(clippy::zero_ptr, clippy::drop_copy)]
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {
@@ -123,13 +123,14 @@ pub fn process(
                 }
                 return;
             },
-            recv(r) -> entry => { match entry {
-                Ok(slurm_job_entry) => archiver.archive(&slurm_job_entry),
-                Err(_) => {
+            recv(r) -> entry => {
+                if let Ok(slurm_job_entry) = entry {
+                    archiver.archive(&slurm_job_entry).unwrap();
+                } else {
                     error!("Error on receiving SlurmJobEntry info");
                     break;
                 }
-            };}
+            }
         }
     }
 }
@@ -147,7 +148,7 @@ pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Pa
         }
     }
     for _ in 0..20 {
-        sender.send(true);
+        sender.send(true).unwrap();
     }
     info!("Sent 20 notifications");
 }

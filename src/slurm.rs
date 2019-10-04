@@ -88,8 +88,6 @@ pub fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     None
 }
 
-
-
 #[cfg(test)]
 mod tests {
 
@@ -97,7 +95,7 @@ mod tests {
     use std::fs::{create_dir, read_to_string, File};
     use tempfile::tempdir;
 
-   #[test]
+    #[test]
     fn test_is_job_path() {
         let tdir = tempdir().unwrap();
 
@@ -111,5 +109,4 @@ mod tests {
         let _faildir = create_dir(&fdir);
         assert_eq!(is_job_path(&fdir), None);
     }
-
 }
