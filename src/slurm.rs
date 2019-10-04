@@ -44,11 +44,13 @@ impl SlurmJobEntry {
     }
 
     pub fn read_script(&self) -> String {
-        fs::read_to_string(self.path.join("script")).expect(&format!("Could not read file {:?}/script", self.path))
+        fs::read_to_string(self.path.join("script"))
+            .expect(&format!("Could not read file {:?}/script", self.path))
     }
 
     pub fn read_env(&self) -> HashMap<String, String> {
-        let s = fs::read_to_string(self.path.join("environment")).expect(&format!("Could not read file {:?}/environment", self.path));
+        let s = fs::read_to_string(self.path.join("environment"))
+            .expect(&format!("Could not read file {:?}/environment", self.path));
 
         s.split('\0')
             .filter(|s| s.len() > 0)
@@ -61,7 +63,6 @@ impl SlurmJobEntry {
                 }
             })
             .collect()
-
     }
 }
 

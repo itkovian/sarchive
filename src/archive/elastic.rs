@@ -20,25 +20,23 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+use super::Archive;
+use crate::slurm::SlurmJobEntry;
 use chrono::{DateTime, Local, Utc};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Error;
 use std::process::exit;
-use super::Archive;
-use crate::slurm::{SlurmJobEntry};
 
 //use elastic::http::header::{self, AUTHORIZATION, HeaderValue};
 use elastic::client::{SyncClient, SyncClientBuilder};
 
-
 pub struct ElasticArchive {
     client: SyncClient,
-    index: String
+    index: String,
 }
 
 fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
-
     let body = json!({
         "mappings": {
             "dynamic": false,
@@ -72,20 +70,22 @@ fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
         }
     });
 
-    client.index(index_name)
+    client
+        .index(index_name)
         .create()
         .body(body.to_string())
-        .send().unwrap();
+        .send()
+        .unwrap();
 
     Ok(())
 }
 
-
 impl ElasticArchive {
     pub fn new(host: &str, port: u16, index: String) -> Self {
         let client = SyncClientBuilder::new()
-                .sniff_nodes(format!("http://{host}:{port}", host=host, port=port))  // TODO: use a pool for serde
-                .build().unwrap();
+            .sniff_nodes(format!("http://{host}:{port}", host = host, port = port)) // TODO: use a pool for serde
+            .build()
+            .unwrap();
 
         // We create the index if it does not exist
         if let Ok(response) = client.index(index.to_owned()).exists().send() {
@@ -110,12 +110,12 @@ impl ElasticArchive {
     }
 }
 
-
 impl Archive for ElasticArchive {
-
     fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
-
-        debug!("ES archiver, received an entry for job ID {:?}", slurm_job_entry.jobid);
+        debug!(
+            "ES archiver, received an entry for job ID {:?}",
+            slurm_job_entry.jobid
+        );
 
         let script = slurm_job_entry.read_script();
         let env = slurm_job_entry.read_env();
@@ -126,15 +126,11 @@ impl Archive for ElasticArchive {
             script: script,
             environment: env,
         };
-        let _res = self.client.document()
-            .index(doc)
-            .send().unwrap();
+        let _res = self.client.document().index(doc).send().unwrap();
 
         Ok(())
     }
-
 }
-
 
 #[derive(Serialize, Deserialize, ElasticType)]
 struct JobInfo {

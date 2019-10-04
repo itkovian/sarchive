@@ -214,26 +214,26 @@ fn main() {
             };
 
             Box::new(FileArchive::new(&archive.to_path_buf(), period))
-        },
+        }
         ("elasticsearch", Some(run_matches)) => {
             info!("Using ElasticSearch archival");
             Box::new(ElasticArchive::new(
                 run_matches.value_of("host").unwrap(),
-                run_matches.value_of("port").unwrap().parse::<u16>().unwrap(),
-                run_matches.value_of("index").unwrap().to_owned()
+                run_matches
+                    .value_of("port")
+                    .unwrap()
+                    .parse::<u16>()
+                    .unwrap(),
+                run_matches.value_of("index").unwrap().to_owned(),
             ))
-        },
+        }
         (&_, _) => {
             error!("No matching subcommand used, exiting");
             exit(1);
         }
     };
 
-    info!(
-        "sarchive starting. Watching hash dirs in {:?}.",
-        &base
-    );
-
+    info!("sarchive starting. Watching hash dirs in {:?}.", &base);
 
     let notification = Arc::new(AtomicBool::new(false));
     let parker = Parker::new();
