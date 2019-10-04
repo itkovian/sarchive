@@ -21,8 +21,8 @@ SOFTWARE.
 */
 pub mod file;
 
-use std::io::Error;
 use super::slurm;
+use std::io::Error;
 
 /// The Archive trait should be implemented by every backend.
 pub trait Archive {
