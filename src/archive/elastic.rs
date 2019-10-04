@@ -22,7 +22,7 @@ SOFTWARE.
 
 use super::Archive;
 use crate::slurm::SlurmJobEntry;
-use chrono::{DateTime, Local, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Error;
@@ -33,7 +33,7 @@ use elastic::client::{SyncClient, SyncClientBuilder};
 
 pub struct ElasticArchive {
     client: SyncClient,
-    index: String,
+    //index: String,
 }
 
 fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
@@ -90,7 +90,7 @@ impl ElasticArchive {
         // We create the index if it does not exist
         if let Ok(response) = client.index(index.to_owned()).exists().send() {
             if !response.exists() {
-                create_index(&client, index.to_owned());
+                create_index(&client, index.to_owned()).unwrap();
             }
         } else {
             error!("Cannot check if index exists. Quitting.");
@@ -104,8 +104,8 @@ impl ElasticArchive {
         //}
 
         ElasticArchive {
-            client: client,
-            index: index.to_owned(),
+            client,
+            //index: index.to_owned(),
         }
     }
 }
@@ -123,7 +123,7 @@ impl Archive for ElasticArchive {
         let doc = JobInfo {
             id: slurm_job_entry.jobid.to_owned(),
             timestamp: Utc::now(),
-            script: script,
+            script,
             environment: env,
         };
         let _res = self.client.document().index(doc).send().unwrap();

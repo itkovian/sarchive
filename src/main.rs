@@ -51,7 +51,9 @@ mod archive;
 mod slurm;
 mod utils;
 
+use archive::elastic::ElasticArchive;
 use archive::file::{FileArchive, Period};
+use archive::Archive;
 use utils::{monitor, process, signal_handler_atomic};
 
 fn setup_logging(
@@ -293,7 +295,7 @@ fn main() {
         }
         let r = &receiver;
         let sr = &sig_receiver;
-        s.spawn(move |_| process(&archiver, r, sr, cleanup));
+        s.spawn(move |_| process(archiver, r, sr, cleanup));
     }) {
         error!("sarchive stopping due to error: {:?}", e);
         exit(1);

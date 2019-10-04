@@ -102,7 +102,7 @@ pub fn monitor(
 /// At the same time, it also checks if there is an incoming notification that it should
 /// stop processing. Upon receipt, it will cease operations immediately.
 pub fn process(
-    archiver: &Box<dyn archive::Archive>,
+    archiver: Box<dyn archive::Archive>,
     r: &Receiver<slurm::SlurmJobEntry>,
     sigchannel: &Receiver<bool>,
     cleanup: bool,
