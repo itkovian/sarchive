@@ -36,7 +36,7 @@ extern crate reopen;
 extern crate serde_json;
 extern crate syslog;
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
@@ -82,8 +82,8 @@ fn setup_logging(
     .apply()
 }
 
-fn main() {
-    let matches = App::new("SArchive")
+fn args<'a>() -> ArgMatches<'a> {
+    App::new("SArchive")
         .version("0.6.0")
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
@@ -168,8 +168,11 @@ fn main() {
                     .help("The index where the documents will be put")
             )
         )
-        .get_matches();
+        .get_matches()
+}
 
+fn main() {
+    let matches = args();
     let log_level = if matches.is_present("debug") {
         log::LevelFilter::Debug
     } else {
