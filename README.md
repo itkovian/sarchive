@@ -18,7 +18,7 @@ This version is what we test against in CI. We also test on
   - beta
   - nightly
 
-for both Linux and MaxOS.
+for both Linux and MacOS.
 
 If you do not have [Rust](https://rustlang.org), please see [Rustup](https://rustup.rs) for installation instructions.
 

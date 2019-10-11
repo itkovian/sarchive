@@ -38,7 +38,7 @@ extern crate syslog;
 
 use clap::{App, Arg, ArgMatches, SubCommand};
 use crossbeam_channel::{bounded, unbounded};
-use crossbeam_utils::sync::Parker;
+use crossbeam_utils::sync::{Parker, Unparker};
 use crossbeam_utils::thread::scope;
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
@@ -88,13 +88,6 @@ fn args<'a>() -> ArgMatches<'a> {
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
         .arg(
-            Arg::with_name("archive")
-                .long("archive")
-                .short("a")
-                .takes_value(true)
-                .help("Location of the job scripts' archive."),
-        )
-        .arg(
             Arg::with_name("cluster")
                 .long("cluster")
                 .short("c")
@@ -125,6 +118,13 @@ fn args<'a>() -> ArgMatches<'a> {
         .subcommand(SubCommand::with_name("file")
             .about("Archive to the filesystem")
             .arg(
+                Arg::with_name("archive")
+                    .long("archive")
+                    .short("a")
+                    .takes_value(true)
+                    .help("Location of the job scripts' archive."),
+            )
+            .arg(
                 Arg::with_name("logfile")
                     .long("logfile")
                     .short("l")
@@ -146,6 +146,9 @@ fn args<'a>() -> ArgMatches<'a> {
         )
         .subcommand(SubCommand::with_name("elasticsearch")
             .about("Archive to ElasticSearch")
+            /*.arg(
+                Arg::with_name("auth")
+            )*/
             .arg(
                 Arg::with_name("host")
                     .long("host")
@@ -171,28 +174,8 @@ fn args<'a>() -> ArgMatches<'a> {
         .get_matches()
 }
 
-fn main() {
-    let matches = args();
-    let log_level = if matches.is_present("debug") {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Info
-    };
-    match setup_logging(log_level, matches.value_of("logfile")) {
-        Ok(_) => (),
-        Err(e) => panic!("Cannot set up logging: {:?}", e),
-    };
-    let base = Path::new(
-        matches
-            .value_of("spool")
-            .expect("You must provide the location of the hash dirs."),
-    );
-    if !base.is_dir() {
-        error!("Provided base {:?} is not a valid directory", base);
-        exit(1);
-    }
-
-    let archiver: Box<dyn Archive> = match matches.subcommand() {
+fn archive_builder(matches: &ArgMatches) -> Box<dyn Archive> {
+    match matches.subcommand() {
         ("file", Some(command_matches)) => {
             let archive = Path::new(
                 command_matches
@@ -236,44 +219,61 @@ fn main() {
             error!("No matching subcommand used, exiting");
             exit(1);
         }
+    }
+}
+
+fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) -> () {
+
+    info!("Registering signal handler for signal {}", signal);
+    let u1 = unparker.clone();
+    let n1 = Arc::clone(&notification);
+    unsafe {
+        if let Err(e) = signal_hook::register(signal, move || {
+            info!("Received signal {}", signal);
+            n1.store(true, SeqCst);
+            u1.unpark()
+        }) {
+            error!("Cannot register signal {}: {:?}", signal, e);
+            exit(1);
+        }
     };
+}
+
+
+fn main() {
+    let matches = args();
+
+    let log_level = if matches.is_present("debug") {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
+    match setup_logging(log_level, matches.value_of("logfile")) {
+        Ok(_) => (),
+        Err(e) => panic!("Cannot set up logging: {:?}", e),
+    };
+    let base = Path::new(
+        matches
+            .value_of("spool")
+            .expect("You must provide the location of the hash dirs."),
+    );
+    if !base.is_dir() {
+        error!("Provided base {:?} is not a valid directory", base);
+        exit(1);
+    }
+
+    let archiver: Box<dyn Archive> = archive_builder(&matches);
 
     info!("sarchive starting. Watching hash dirs in {:?}.", &base);
 
     let notification = Arc::new(AtomicBool::new(false));
     let parker = Parker::new();
-    let unparker = parker.unparker().clone();
+    let unparker = parker.unparker();
 
-    info!("Registering signal handler for SIGTERM");
-    let u1 = unparker.clone();
-    let n1 = Arc::clone(&notification);
-    unsafe {
-        if let Err(e) = signal_hook::register(signal_hook::SIGTERM, move || {
-            info!("Received SIGTERM");
-            n1.store(true, SeqCst);
-            u1.unpark()
-        }) {
-            error!("Cannot register signal for SIGTERM: {:?}", e);
-            exit(1);
-        }
-    };
-
-    info!("Registering signal handler for SIGINT");
-    let u2 = unparker.clone();
-    let n2 = Arc::clone(&notification);
-    unsafe {
-        if let Err(e) = signal_hook::register(signal_hook::SIGINT, move || {
-            info!("Received SIGINT");
-            n2.store(true, SeqCst);
-            u2.unpark()
-        }) {
-            error!("Cannot register signal for SIGTERM: {:?})", e);
-            exit(1);
-        }
-    };
+    register_signal_handler(signal_hook::SIGTERM, &unparker, &notification);
+    register_signal_handler(signal_hook::SIGINT, &unparker, &notification);
 
     let (sig_sender, sig_receiver) = bounded(20);
-
     let cleanup = matches.is_present("cleanup");
 
     // we will watch the ten hash.X directories
