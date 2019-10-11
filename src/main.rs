@@ -222,7 +222,7 @@ fn archive_builder(matches: &ArgMatches) -> Box<dyn Archive> {
     }
 }
 
-fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) -> () {
+fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
     info!("Registering signal handler for signal {}", signal);
     let u1 = unparker.clone();
     let n1 = Arc::clone(&notification);
