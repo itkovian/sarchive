@@ -58,6 +58,8 @@ use archive::file::{FileArchive, Period};
 use archive::Archive;
 use utils::{monitor, process, signal_handler_atomic};
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 fn setup_logging(
     level_filter: log::LevelFilter,
     logfile: Option<&str>,
@@ -86,7 +88,7 @@ fn setup_logging(
 
 fn args<'a>() -> ArgMatches<'a> {
     App::new("SArchive")
-        .version("0.6.0")
+        .version(VERSION)
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
         .arg(
