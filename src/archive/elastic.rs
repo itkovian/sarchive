@@ -23,11 +23,41 @@ SOFTWARE.
 use super::Archive;
 use crate::slurm::SlurmJobEntry;
 use chrono::{DateTime, Utc};
+use clap::{App, Arg, SubCommand};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Error;
 use std::process::exit;
 
+/// Command line options for the elastic archiver subcommand
+pub fn clap_subcommand(command: &str) -> App {
+    SubCommand::with_name(command)
+        .about("Archive to ElasticSearch")
+        /*.arg(
+            Arg::with_name("auth")
+        )*/
+        .arg(
+            Arg::with_name("host")
+                .long("host")
+                .takes_value(true)
+                .default_value("localhost")
+                .help("The hostname of the ElasticSearch server"),
+        )
+        .arg(
+            Arg::with_name("port")
+                .long("port")
+                .takes_value(true)
+                .default_value("9200")
+                .help("The port of the ElasticSearch service"),
+        )
+        .arg(
+            Arg::with_name("index")
+                .long("index")
+                .takes_value(true)
+                .required(true)
+                .help("The index where the documents will be put"),
+        )
+}
 //use elastic::http::header::{self, AUTHORIZATION, HeaderValue};
 use elastic::client::{SyncClient, SyncClientBuilder};
 

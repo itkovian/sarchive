@@ -36,7 +36,7 @@ extern crate reopen;
 extern crate serde_json;
 extern crate syslog;
 
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::{Parker, Unparker};
 use crossbeam_utils::thread::scope;
@@ -51,7 +51,9 @@ mod archive;
 mod slurm;
 mod utils;
 
+use archive::elastic as el;
 use archive::elastic::ElasticArchive;
+use archive::file;
 use archive::file::{FileArchive, Period};
 use archive::Archive;
 use utils::{monitor, process, signal_handler_atomic};
@@ -115,62 +117,8 @@ fn args<'a>() -> ArgMatches<'a> {
                     "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
                 )
         )
-        .subcommand(SubCommand::with_name("file")
-            .about("Archive to the filesystem")
-            .arg(
-                Arg::with_name("archive")
-                    .long("archive")
-                    .short("a")
-                    .takes_value(true)
-                    .help("Location of the job scripts' archive."),
-            )
-            .arg(
-                Arg::with_name("logfile")
-                    .long("logfile")
-                    .short("l")
-                    .takes_value(true)
-                    .help("Log file name.")
-            )
-            .arg(
-                Arg::with_name("period")
-                    .long("period")
-                    .short("p")
-                    .takes_value(true)
-                    .possible_value("yearly")
-                    .possible_value("monthly")
-                    .possible_value("daily")
-                    .help(
-                        "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
-                    )
-            )
-        )
-        .subcommand(SubCommand::with_name("elasticsearch")
-            .about("Archive to ElasticSearch")
-            /*.arg(
-                Arg::with_name("auth")
-            )*/
-            .arg(
-                Arg::with_name("host")
-                    .long("host")
-                    .takes_value(true)
-                    .default_value("localhost")
-                    .help("The hostname of the ElasticSearch server")
-            )
-            .arg(
-                Arg::with_name("port")
-                    .long("port")
-                    .takes_value(true)
-                    .default_value("9200")
-                    .help("The port of the ElasticSearch service")
-            )
-            .arg(
-                Arg::with_name("index")
-                    .long("index")
-                    .takes_value(true)
-                    .required(true)
-                    .help("The index where the documents will be put")
-            )
-        )
+        .subcommand(file::clap_subcommand("file"))
+        .subcommand(el::clap_subcommand("elasticsearch"))
         .get_matches()
 }
 
