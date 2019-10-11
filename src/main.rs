@@ -40,7 +40,6 @@ use clap::{App, Arg, ArgMatches};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::{Parker, Unparker};
 use crossbeam_utils::thread::scope;
-use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
@@ -54,11 +53,11 @@ mod utils;
 use archive::elastic as el;
 use archive::elastic::ElasticArchive;
 use archive::file;
-use archive::file::{FileArchive, Period};
+use archive::file::FileArchive;
 use archive::Archive;
 use utils::{monitor, process, signal_handler_atomic};
 
-const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn setup_logging(
     level_filter: log::LevelFilter,
@@ -127,43 +126,18 @@ fn args<'a>() -> ArgMatches<'a> {
 fn archive_builder(matches: &ArgMatches) -> Box<dyn Archive> {
     match matches.subcommand() {
         ("file", Some(command_matches)) => {
-            let archive = Path::new(
-                command_matches
-                    .value_of("archive")
-                    .expect("You must provide the location of the archive"),
-            );
-
-            if !archive.is_dir() {
-                warn!(
-                    "Provided archive {:?} is not a valid directory, creating it.",
-                    &archive
-                );
-                if let Err(e) = create_dir_all(&archive) {
-                    error!("Unable to create archive at {:?}. {}", &archive, e);
-                    exit(1);
-                }
-            };
-
-            let period = match command_matches.value_of("period") {
-                Some("yearly") => Period::Yearly,
-                Some("monthly") => Period::Monthly,
-                Some("daily") => Period::Daily,
-                _ => Period::None,
-            };
-
-            Box::new(FileArchive::new(&archive.to_path_buf(), period))
+            if let Ok(fa) = FileArchive::build(command_matches) {
+                Box::new(fa)
+            } else {
+                exit(1);
+            }
         }
         ("elasticsearch", Some(run_matches)) => {
-            info!("Using ElasticSearch archival");
-            Box::new(ElasticArchive::new(
-                run_matches.value_of("host").unwrap(),
-                run_matches
-                    .value_of("port")
-                    .unwrap()
-                    .parse::<u16>()
-                    .unwrap(),
-                run_matches.value_of("index").unwrap().to_owned(),
-            ))
+            if let Ok(ea) = ElasticArchive::build(run_matches) {
+                Box::new(ea)
+            } else {
+                exit(1);
+            }
         }
         (&_, _) => {
             error!("No matching subcommand used, exiting");

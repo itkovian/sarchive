@@ -23,7 +23,7 @@ SOFTWARE.
 use super::Archive;
 use crate::slurm::SlurmJobEntry;
 use chrono::{DateTime, Utc};
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Error;
@@ -137,6 +137,15 @@ impl ElasticArchive {
             client,
             //index: index.to_owned(),
         }
+    }
+
+    pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
+        info!("Using ElasticSearch archival");
+        Ok(ElasticArchive::new(
+            matches.value_of("host").unwrap(),
+            matches.value_of("port").unwrap().parse::<u16>().unwrap(),
+            matches.value_of("index").unwrap().to_owned(),
+        ))
     }
 }
 

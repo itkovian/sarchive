@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, ArgMatches, SubCommand};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -85,6 +85,34 @@ impl FileArchive {
             archive_path: archive_path.clone(),
             period: p,
         }
+    }
+
+    pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
+        let archive = Path::new(
+            matches
+                .value_of("archive")
+                .expect("You must provide the location of the archive"),
+        );
+
+        if !archive.is_dir() {
+            warn!(
+                "Provided archive {:?} is not a valid directory, creating it.",
+                &archive
+            );
+            if let Err(e) = create_dir_all(&archive) {
+                error!("Unable to create archive at {:?}. {}", &archive, e);
+                return Err(e);
+            }
+        };
+
+        let period = match matches.value_of("period") {
+            Some("yearly") => Period::Yearly,
+            Some("monthly") => Period::Monthly,
+            Some("daily") => Period::Daily,
+            _ => Period::None,
+        };
+
+        Ok(FileArchive::new(&archive.to_path_buf(), period))
     }
 }
 
