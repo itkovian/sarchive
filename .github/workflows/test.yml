@@ -24,7 +24,7 @@ jobs:
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: -- -D warnings
+          args: --all-features -- -D warnings
 
   fmt:
     runs-on: ubuntu-18.04
@@ -60,6 +60,9 @@ jobs:
           - beta
           - nightly
           - 1.34.2
+        features:
+          - --features elasticsearch-7
+          - --no-default-features
       fail-fast: false
 
     steps:
@@ -73,4 +76,4 @@ jobs:
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
-          command: test
+          command: test ${{ matrix.features }}

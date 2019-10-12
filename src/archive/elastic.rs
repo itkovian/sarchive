@@ -26,6 +26,7 @@ use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::io::Error;
 use std::process::exit;
 
@@ -110,6 +111,30 @@ fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
     Ok(())
 }
 
+impl SlurmJobEntry {
+    pub fn read_script(&self) -> String {
+        fs::read_to_string(self.path.join("script"))
+            .unwrap_or_else(|_| panic!("Could not read file {:?}/script", self.path))
+    }
+
+    pub fn read_env(&self) -> HashMap<String, String> {
+        let s = fs::read_to_string(self.path.join("environment"))
+            .unwrap_or_else(|_| panic!("Could not read file {:?}/environment", self.path));
+
+        s.split('\0')
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                let ps: Vec<_> = s.split('=').collect();
+                if ps.len() == 2 {
+                    (ps[0].to_owned(), ps[1].to_owned())
+                } else {
+                    (s.to_owned(), String::from(""))
+                }
+            })
+            .collect()
+    }
+}
+
 impl ElasticArchive {
     pub fn new(host: &str, port: u16, index: String) -> Self {
         let client = SyncClientBuilder::new()
@@ -171,6 +196,7 @@ impl Archive for ElasticArchive {
     }
 }
 
+#[cfg(feature = "elasticsearch-7")]
 #[derive(Serialize, Deserialize, ElasticType)]
 struct JobInfo {
     #[elastic(id)]
