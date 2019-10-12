@@ -51,10 +51,8 @@ mod slurm;
 mod utils;
 
 use archive::elastic as el;
-use archive::elastic::ElasticArchive;
 use archive::file;
-use archive::file::FileArchive;
-use archive::Archive;
+use archive::{archive_builder, Archive};
 use utils::{monitor, process, signal_handler_atomic};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -123,29 +121,6 @@ fn args<'a>() -> ArgMatches<'a> {
         .get_matches()
 }
 
-fn archive_builder(matches: &ArgMatches) -> Box<dyn Archive> {
-    match matches.subcommand() {
-        ("file", Some(command_matches)) => {
-            if let Ok(fa) = FileArchive::build(command_matches) {
-                Box::new(fa)
-            } else {
-                exit(1);
-            }
-        }
-        ("elasticsearch", Some(run_matches)) => {
-            if let Ok(ea) = ElasticArchive::build(run_matches) {
-                Box::new(ea)
-            } else {
-                exit(1);
-            }
-        }
-        (&_, _) => {
-            error!("No matching subcommand used, exiting");
-            exit(1);
-        }
-    }
-}
-
 fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
     info!("Registering signal handler for signal {}", signal);
     let u1 = unparker.clone();
@@ -184,7 +159,7 @@ fn main() {
         exit(1);
     }
 
-    let archiver: Box<dyn Archive> = archive_builder(&matches);
+    let archiver: Box<dyn Archive> = archive_builder(&matches).unwrap();
 
     info!("sarchive starting. Watching hash dirs in {:?}.", &base);
 
