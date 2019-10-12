@@ -18,7 +18,7 @@ This version is what we test against in CI. We also test on
   - beta
   - nightly
 
-for both Linux and MaxOS.
+for both Linux and MacOS.
 
 If you do not have [Rust](https://rustlang.org), please see [Rustup](https://rustup.rs) for installation instructions.
 
@@ -47,6 +47,7 @@ are also created upon file archival if they do not exist.
 - Experimental support for clean termination on receipt of SIGTERM or SIGINT, where
   job events that have already been seen are processed, to minimise potential loss
   when restarting the service.
+- Output to Elasticsearch
 
 ## RPMs
 

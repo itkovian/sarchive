@@ -19,6 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+use clap::{App, Arg, ArgMatches, SubCommand};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -27,6 +28,38 @@ use std::time::Duration;
 
 use super::super::slurm::SlurmJobEntry;
 use super::Archive;
+
+/// Command line options for the file archiver subcommand
+pub fn clap_subcommand(command: &str) -> App {
+    SubCommand::with_name(command)
+        .about("Archive to the filesystem")
+        .arg(
+            Arg::with_name("archive")
+                .long("archive")
+                .short("a")
+                .takes_value(true)
+                .help("Location of the job scripts' archive."),
+        )
+        .arg(
+            Arg::with_name("logfile")
+                .long("logfile")
+                .short("l")
+                .takes_value(true)
+                .help("Log file name.")
+        )
+        .arg(
+            Arg::with_name("period")
+                .long("period")
+                .short("p")
+                .takes_value(true)
+                .possible_value("yearly")
+                .possible_value("monthly")
+                .possible_value("daily")
+                .help(
+                    "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
+                )
+        )
+}
 
 /// An enum to define a hierachy in the archive
 pub enum Period {
@@ -52,6 +85,34 @@ impl FileArchive {
             archive_path: archive_path.clone(),
             period: p,
         }
+    }
+
+    pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
+        let archive = Path::new(
+            matches
+                .value_of("archive")
+                .expect("You must provide the location of the archive"),
+        );
+
+        if !archive.is_dir() {
+            warn!(
+                "Provided archive {:?} is not a valid directory, creating it.",
+                &archive
+            );
+            if let Err(e) = create_dir_all(&archive) {
+                error!("Unable to create archive at {:?}. {}", &archive, e);
+                return Err(e);
+            }
+        };
+
+        let period = match matches.value_of("period") {
+            Some("yearly") => Period::Yearly,
+            Some("monthly") => Period::Monthly,
+            Some("daily") => Period::Daily,
+            _ => Period::None,
+        };
+
+        Ok(FileArchive::new(&archive.to_path_buf(), period))
     }
 }
 

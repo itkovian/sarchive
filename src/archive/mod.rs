@@ -19,12 +19,34 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
+pub mod elastic;
 pub mod file;
 
+use self::elastic::ElasticArchive;
 use super::slurm;
-use std::io::Error;
+use clap::ArgMatches;
+use file::FileArchive;
+use std::io::{Error, ErrorKind};
 
 /// The Archive trait should be implemented by every backend.
-pub trait Archive {
+pub trait Archive: Send {
     fn archive(&self, slurm_job_entry: &slurm::SlurmJobEntry) -> Result<(), Error>;
+}
+
+pub fn archive_builder(matches: &ArgMatches) -> Result<Box<dyn Archive>, Error> {
+    match matches.subcommand() {
+        ("file", Some(command_matches)) => {
+            let archive = FileArchive::build(command_matches)?;
+            Ok(Box::new(archive))
+        }
+        ("elasticsearch", Some(run_matches)) => {
+            let archive = ElasticArchive::build(run_matches)?;
+            Ok(Box::new(archive))
+        }
+        (&_, _) => Err(Error::new(
+            ErrorKind::Other,
+            "No supported archival subcommand used",
+        )),
+    }
 }
