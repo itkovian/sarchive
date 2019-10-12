@@ -27,7 +27,7 @@ elastic_derive = "~0.21.0-pre.5"
 fern = { git = "https://github.com/daboross/fern", rev = "1c8fd50", features = ["reopen-03"]}
 futures = "0.1.28"
 #notify = "5.0.0-pre.1"
-notify = { git = "https://github.com/passcod/notify", rev = "0709c94" }
+notify = { git = "https://github.com/passcod/notify", rev = "e04ec0236b2" }  # following latest main branch
 libc = "0.2.60"
 log = "^0.4"
 reopen = "^0.3.0"

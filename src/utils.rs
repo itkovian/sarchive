@@ -70,7 +70,7 @@ pub fn monitor(
     let (tx, rx) = unbounded();
 
     // create a platform-specific watcher
-    let mut watcher: RecommendedWatcher = Watcher::new_immediate(tx)?;
+    let mut watcher = RecommendedWatcher::new_immediate(move |res| tx.send(res).unwrap())?;
     let path = base.join(format!("hash.{}", hash));
 
     info!("Watching path {:?}", &path);
@@ -85,8 +85,9 @@ pub fn monitor(
                 return Ok(());
             },
             recv(rx) -> event => {
-                if let Ok(Ok(e)) = event { check_and_queue(s, e)? }
-                else {
+                if let Ok(Ok(e)) = event {
+                    check_and_queue(s, e)?
+                } else {
                     error!("Error on received event: {:?}", event);
                     break;
                 }
