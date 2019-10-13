@@ -20,9 +20,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#[cfg(feature = "elasticsearch-7")]
 pub mod elastic;
 pub mod file;
 
+#[cfg(feature = "elasticsearch-7")]
 use self::elastic::ElasticArchive;
 use super::slurm;
 use clap::ArgMatches;
@@ -40,6 +42,7 @@ pub fn archive_builder(matches: &ArgMatches) -> Result<Box<dyn Archive>, Error> 
             let archive = FileArchive::build(command_matches)?;
             Ok(Box::new(archive))
         }
+        #[cfg(feature = "elasticsearch-7")]
         ("elasticsearch", Some(run_matches)) => {
             let archive = ElasticArchive::build(run_matches)?;
             Ok(Box::new(archive))

@@ -23,7 +23,9 @@ extern crate chrono;
 extern crate clap;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
+#[cfg(feature = "elasticsearch-7")]
 extern crate elastic;
+#[cfg(feature = "elasticsearch-7")]
 #[macro_use]
 extern crate elastic_derive;
 extern crate fern;
@@ -32,6 +34,7 @@ extern crate libc;
 extern crate log;
 extern crate notify;
 extern crate reopen;
+#[cfg(feature = "elasticsearch-7")]
 #[macro_use]
 extern crate serde_json;
 extern crate syslog;
@@ -50,6 +53,7 @@ mod archive;
 mod slurm;
 mod utils;
 
+#[cfg(feature = "elasticsearch-7")]
 use archive::elastic as el;
 use archive::file;
 use archive::{archive_builder, Archive};
@@ -84,7 +88,7 @@ fn setup_logging(
 }
 
 fn args<'a>() -> ArgMatches<'a> {
-    App::new("SArchive")
+    let matches = App::new("SArchive")
         .version(VERSION)
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
@@ -116,9 +120,11 @@ fn args<'a>() -> ArgMatches<'a> {
                     "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
                 )
         )
-        .subcommand(file::clap_subcommand("file"))
-        .subcommand(el::clap_subcommand("elasticsearch"))
-        .get_matches()
+        .subcommand(file::clap_subcommand("file"));
+
+    #[cfg(feature = "elasticsearch-7")]
+    let matches = matches.subcommand(el::clap_subcommand("elasticsearch"));
+    matches.get_matches()
 }
 
 fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {

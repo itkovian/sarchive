@@ -272,16 +272,16 @@ mod tests {
         // create env and script files
         let env_path = job_dir.join("environment");
         let mut env = File::create(env_path).unwrap();
-        env.write(b"environment");
+        env.write(b"environment").unwrap();
 
         let job_path = job_dir.join("script");
         let mut job = File::create(&job_path).unwrap();
-        job.write(b"job script");
+        job.write(b"job script").unwrap();
 
         let slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234");
 
         let file_archiver = FileArchive::new(&archive_dir, Period::None);
-        file_archiver.archive(&slurm_job_entry);
+        file_archiver.archive(&slurm_job_entry).unwrap();
 
         assert!(Path::is_file(&archive_dir.join("job.1234_environment")));
         assert!(Path::is_file(&archive_dir.join("job.1234_script")));
