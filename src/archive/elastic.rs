@@ -205,3 +205,23 @@ struct JobInfo {
     pub script: String,
     pub environment: HashMap<String, String>,
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use super::super::*;
+    use std::path::PathBuf;
+    use std::env;
+
+    #[test]
+    fn test_read_env() {
+        let path = PathBuf::from("tests/job.123456");
+        let slurm_job_entry = SlurmJobEntry::new(&path, "123456");
+        let hm = slurm_job_entry.read_env();
+
+        assert_eq!(hm.len(), 46);
+        assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
+        assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
+    }
+}
