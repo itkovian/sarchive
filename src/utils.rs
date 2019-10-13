@@ -107,7 +107,7 @@ pub fn process(
     r: &Receiver<slurm::SlurmJobEntry>,
     sigchannel: &Receiver<bool>,
     cleanup: bool,
-) {
+) -> Result<(), Error> {
     info!("Start processing events");
     #[allow(clippy::zero_ptr, clippy::drop_copy)]
     loop {
@@ -118,15 +118,15 @@ pub fn process(
                 } else {
                 info!("Processing {} entries, then stopping", r.len());
                 for entry in r.iter() {
-                    archiver.archive(&entry).unwrap();
+                    archiver.archive(&entry)?;
                 }
                 info!("Done processing");
                 }
-                return;
+                break;
             },
             recv(r) -> entry => {
                 if let Ok(slurm_job_entry) = entry {
-                    archiver.archive(&slurm_job_entry).unwrap();
+                    archiver.archive(&slurm_job_entry)?;
                 } else {
                     error!("Error on receiving SlurmJobEntry info");
                     break;
@@ -134,6 +134,7 @@ pub fn process(
             }
         }
     }
+    Ok(())
 }
 
 /// This function will park the thread until it is unparked and check the
@@ -152,4 +153,45 @@ pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Pa
         sender.send(true).unwrap();
     }
     info!("Sent 20 notifications");
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use archive::Archive;
+    use crossbeam_utils::thread::scope;
+    use slurm::SlurmJobEntry;
+    use std::path::PathBuf;
+    use std::thread::sleep;
+    use std::time::Duration;
+
+    struct DummyArchiver;
+
+    impl Archive for DummyArchiver {
+        fn archive(&self, _: &SlurmJobEntry) -> Result<(), Error> {
+            info!("Archiving");
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_process() {
+        let (tx1, rx1) = unbounded();
+        let (tx2, rx2) = unbounded();
+        let archiver = Box::new(DummyArchiver);
+
+        scope(|s| {
+            let path = PathBuf::from("/my/path");
+            let slurm_job_entry = SlurmJobEntry::new(&path, "123456");
+            s.spawn(move |_| match process(archiver, &rx1, &rx2, false) {
+                Ok(v) => assert_eq!(v, ()),
+                Err(_) => panic!("Unexpected error from process function"),
+            });
+            tx1.send(slurm_job_entry).unwrap();
+            sleep(Duration::from_millis(1000));
+            tx2.send(true).unwrap();
+        })
+        .unwrap();
+    }
 }
