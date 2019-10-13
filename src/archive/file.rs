@@ -281,7 +281,7 @@ mod tests {
         let slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234");
 
         let file_archiver = FileArchive::new(&archive_dir, Period::None);
-        file_archiver.archive(&slurm_job_entry);
+        file_archiver.archive(&slurm_job_entry).unwrap();
 
         assert!(Path::is_file(&archive_dir.join("job.1234_environment")));
         assert!(Path::is_file(&archive_dir.join("job.1234_script")));

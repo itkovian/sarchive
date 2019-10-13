@@ -210,9 +210,8 @@ struct JobInfo {
 mod tests {
 
     use super::*;
-    use super::super::*;
-    use std::path::PathBuf;
     use std::env;
+    use std::path::PathBuf;
 
     #[test]
     fn test_read_env() {
