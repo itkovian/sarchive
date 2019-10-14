@@ -10,6 +10,8 @@ SArchive
 
 Archival tool for Slurm job scripts and accompanying environment files.
 
+Note that the version on crates.io is older, since we rely on both fern and notify, whcih do havee the latest version in the crate registry (yet). 
+
 ## Minimum supported `rustc`
 
 `1.34.2+`
