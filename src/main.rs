@@ -30,8 +30,8 @@ extern crate elastic;
 extern crate elastic_derive;
 extern crate fern;
 extern crate libc;
-#[macro_use]
-extern crate log;
+//#[macro_use]
+//extern crate log;
 extern crate notify;
 extern crate reopen;
 #[cfg(feature = "elasticsearch-7")]
@@ -43,6 +43,7 @@ use clap::{App, Arg, ArgMatches};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::{Parker, Unparker};
 use crossbeam_utils::thread::scope;
+use log::{error,info};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
