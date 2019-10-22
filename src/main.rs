@@ -19,31 +19,21 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-extern crate chrono;
-extern crate clap;
-extern crate crossbeam_channel;
-extern crate crossbeam_utils;
 #[cfg(feature = "elasticsearch-7")]
 extern crate elastic;
 #[cfg(feature = "elasticsearch-7")]
 #[macro_use]
 extern crate elastic_derive;
-extern crate fern;
-extern crate libc;
-//#[macro_use]
-//extern crate log;
-extern crate notify;
-extern crate reopen;
 #[cfg(feature = "elasticsearch-7")]
 #[macro_use]
 extern crate serde_json;
-extern crate syslog;
 
+use chrono;
 use clap::{App, Arg, ArgMatches};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::{Parker, Unparker};
 use crossbeam_utils::thread::scope;
-use log::{error,info};
+use log::{error, info};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::atomic::AtomicBool;

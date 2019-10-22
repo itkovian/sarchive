@@ -24,7 +24,7 @@ use super::Archive;
 use crate::slurm::SlurmJobEntry;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
-use log::{debug,error,info,warn};
+use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
