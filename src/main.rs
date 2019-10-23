@@ -19,14 +19,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#[cfg(feature = "elasticsearch-7")]
-extern crate elastic;
-#[cfg(feature = "elasticsearch-7")]
-#[macro_use]
-extern crate elastic_derive;
-#[cfg(feature = "elasticsearch-7")]
-#[macro_use]
-extern crate serde_json;
 
 use chrono;
 use clap::{App, Arg, ArgMatches};
