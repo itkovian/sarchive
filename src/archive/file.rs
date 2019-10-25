@@ -20,6 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 use clap::{App, Arg, ArgMatches, SubCommand};
+use log::{debug, error, info, warn};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
