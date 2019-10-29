@@ -34,7 +34,7 @@ If you do not have [Rust](https://rustlang.org), please see [Rustup](https://rus
 
 The archive can be further divided into subdirectories per
   - year: YYYY, by provinging `--period=yearly`
-  - month: YYYYMM, by providing `--period=montly`
+  - month: YYYYMM, by providing `--period=monthly`
   - day: YYYYMMDD, by providing `--period=daily`
 This allows for easily tarring old(er) directories you still wish to keep around,
 but probably no longer immediately need for user support. Each of these directories
