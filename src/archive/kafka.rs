@@ -20,38 +20,28 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#[cfg(feature = "elasticsearch-7")]
-pub mod elastic;
-pub mod file;
-#[cfg(feature = "kafka")]
-pub mod kafka;
+use super::Archive;
+use crate::slurm::SlurmJobEntry;
+use chrono::{DateTime, Utc};
+use clap::{App, Arg, ArgMatches, SubCommand};
+use log::{debug, error, info};
+use std::collections::HashMap;
+use std::fs;
+use std::io::Error;
+use std::process::exit;
 
-#[cfg(feature = "elasticsearch-7")]
-use self::elastic::ElasticArchive;
-use super::slurm;
-use clap::ArgMatches;
-use file::FileArchive;
-use std::io::{Error, ErrorKind};
 
-/// The Archive trait should be implemented by every backend.
-pub trait Archive: Send {
-    fn archive(&self, slurm_job_entry: &slurm::SlurmJobEntry) -> Result<(), Error>;
-}
-
-pub fn archive_builder(matches: &ArgMatches) -> Result<Box<dyn Archive>, Error> {
-    match matches.subcommand() {
-        ("file", Some(command_matches)) => {
-            let archive = FileArchive::build(command_matches)?;
-            Ok(Box::new(archive))
-        }
-        #[cfg(feature = "elasticsearch-7")]
-        ("elasticsearch", Some(run_matches)) => {
-            let archive = ElasticArchive::build(run_matches)?;
-            Ok(Box::new(archive))
-        }
-        (&_, _) => Err(Error::new(
-            ErrorKind::Other,
-            "No supported archival subcommand used",
-        )),
-    }
+pub fn clap_subcommand(command: &str) -> App {
+    SubCommand::with_name(command)
+        .about("Archive to Kafka")
+        .arg(Arg::with_name("brokers")
+            .long("brokers")
+            .takes_value(true)
+            .default_value("localhost:9092")
+        )
+        .arg(Arg::with_name("topic")
+            .long("topic")
+            .takes_value(true)
+            .default_value("sarchive")
+        )
 }

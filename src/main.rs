@@ -36,10 +36,12 @@ mod archive;
 mod slurm;
 mod utils;
 
-#[cfg(feature = "elasticsearch-7")]
-use archive::elastic as el;
 use archive::file;
 use archive::{archive_builder, Archive};
+#[cfg(feature = "elasticsearch-7")]
+use archive::elastic as el;
+#[cfg(feature = "kafka")]
+use archive::kafka as kf;
 use utils::{monitor, process, signal_handler_atomic};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -107,6 +109,8 @@ fn args<'a>() -> ArgMatches<'a> {
 
     #[cfg(feature = "elasticsearch-7")]
     let matches = matches.subcommand(el::clap_subcommand("elasticsearch"));
+    #[cfg(feature = "kafka")]
+    let matches = matches.subcommand(kf::clap_subcommand("kafka"));
     matches.get_matches()
 }
 
