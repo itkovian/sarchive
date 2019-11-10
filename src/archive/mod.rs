@@ -31,6 +31,7 @@ use self::elastic::ElasticArchive;
 use super::slurm;
 use clap::ArgMatches;
 use file::FileArchive;
+use kafka::KafkaArchive;
 use std::io::{Error, ErrorKind};
 
 /// The Archive trait should be implemented by every backend.
@@ -47,6 +48,11 @@ pub fn archive_builder(matches: &ArgMatches) -> Result<Box<dyn Archive>, Error> 
         #[cfg(feature = "elasticsearch-7")]
         ("elasticsearch", Some(run_matches)) => {
             let archive = ElasticArchive::build(run_matches)?;
+            Ok(Box::new(archive))
+        }
+        #[cfg(feature = "kafka")]
+        ("kafka", Some(run_matches)) => {
+            let archive = KafkaArchive::build(run_matches)?;
             Ok(Box::new(archive))
         }
         (&_, _) => Err(Error::new(

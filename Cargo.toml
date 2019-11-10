@@ -38,7 +38,7 @@ serde = { version = "~1", optional = true }
 serde_derive = { version = "~1", optional = true }
 serde_json = { version = "~1", optional = true }
 
-rdkafka = { git = "https://github.com/fede1024/rust-rdkafka", rev = "46f9a0a", features = [ "ssl", "sasl"], optional = true }
+rdkafka = { git = "https://github.com/fede1024/rust-rdkafka", rev = "46f9a0a", optional = true }
 
 [features]
 elasticsearch-7 = ["elastic", "elastic_derive", "serde", "serde_derive", "serde_json"]

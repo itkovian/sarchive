@@ -24,6 +24,9 @@ use super::Archive;
 use crate::slurm::SlurmJobEntry;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
+use rdkafka::config::ClientConfig;
+use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::util::get_rdkafka_version;
 use log::{debug, error, info};
 use std::collections::HashMap;
 use std::fs;
@@ -38,10 +41,55 @@ pub fn clap_subcommand(command: &str) -> App {
             .long("brokers")
             .takes_value(true)
             .default_value("localhost:9092")
+            .help("Comma-separated list of brokers")
         )
         .arg(Arg::with_name("topic")
             .long("topic")
             .takes_value(true)
             .default_value("sarchive")
+            .help("Topic under which to send messages to Kafka")
         )
+        .arg(Arg::with_name("message_timeout")
+            .long("message.timeout")
+            .takes_value(true)
+            .default_value("5000")
+            .help("Message timout in ms")
+        )
+}
+
+
+pub struct KafkaArchive {
+    producer: FutureProducer,
+    topic: String
+}
+
+impl KafkaArchive {
+
+    pub fn new(brokers: &str, topic: &str, message_timeout: &str) -> Self {
+        KafkaArchive {
+            producer: ClientConfig::new()
+                .set("bootstrap.servers", brokers)
+                .set("message.timeout.ms", message_timeout)
+                .create()
+                .expect("Cannot create Kafka producer. Aborting."),
+            topic: topic.to_owned()
+        }
+    }
+
+    pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
+        info!("Using ElasticSearch archival");
+        Ok(KafkaArchive::new(
+            matches.value_of("brokers").unwrap(),
+            matches.value_of("topic").unwrap(),
+            matches.value_of("message_timeout").unwrap()
+        ))
+    }
+
+}
+
+
+impl Archive for KafkaArchive {
+    fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+        Ok(())
+    }
 }
