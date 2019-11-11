@@ -28,7 +28,7 @@ use elastic_derive::ElasticType;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::fs;
+use std::collections::HashMap;
 use std::io::Error;
 use std::process::exit;
 

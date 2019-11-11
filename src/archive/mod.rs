@@ -31,7 +31,8 @@ use self::elastic::ElasticArchive;
 use super::slurm;
 use clap::ArgMatches;
 use file::FileArchive;
-use kafka::KafkaArchive;
+#[cfg(feature = "kafka")]
+use self::kafka::KafkaArchive;
 use std::io::{Error, ErrorKind};
 
 /// The Archive trait should be implemented by every backend.

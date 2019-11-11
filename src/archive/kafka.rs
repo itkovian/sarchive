@@ -25,16 +25,13 @@ use crate::slurm::SlurmJobEntry;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::future::Future;
-use log::{debug, error, info};
+use log::{debug, info};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use rdkafka::util::get_rdkafka_version;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
-use std::fs;
 use std::io::Error;
-use std::process::exit;
 
 pub fn clap_subcommand(command: &str) -> App {
     SubCommand::with_name(command)
