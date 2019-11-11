@@ -36,12 +36,12 @@ mod archive;
 mod slurm;
 mod utils;
 
-use archive::file;
-use archive::{archive_builder, Archive};
 #[cfg(feature = "elasticsearch-7")]
 use archive::elastic as el;
+use archive::file;
 #[cfg(feature = "kafka")]
 use archive::kafka as kf;
+use archive::{archive_builder, Archive};
 use utils::{monitor, process, signal_handler_atomic};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");

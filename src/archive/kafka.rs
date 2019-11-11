@@ -36,38 +36,38 @@ use std::fs;
 use std::io::Error;
 use std::process::exit;
 
-
 pub fn clap_subcommand(command: &str) -> App {
     SubCommand::with_name(command)
         .about("Archive to Kafka")
-        .arg(Arg::with_name("brokers")
-            .long("brokers")
-            .takes_value(true)
-            .default_value("localhost:9092")
-            .help("Comma-separated list of brokers")
+        .arg(
+            Arg::with_name("brokers")
+                .long("brokers")
+                .takes_value(true)
+                .default_value("localhost:9092")
+                .help("Comma-separated list of brokers"),
         )
-        .arg(Arg::with_name("topic")
-            .long("topic")
-            .takes_value(true)
-            .default_value("sarchive")
-            .help("Topic under which to send messages to Kafka")
+        .arg(
+            Arg::with_name("topic")
+                .long("topic")
+                .takes_value(true)
+                .default_value("sarchive")
+                .help("Topic under which to send messages to Kafka"),
         )
-        .arg(Arg::with_name("message_timeout")
-            .long("message.timeout")
-            .takes_value(true)
-            .default_value("5000")
-            .help("Message timout in ms")
+        .arg(
+            Arg::with_name("message_timeout")
+                .long("message.timeout")
+                .takes_value(true)
+                .default_value("5000")
+                .help("Message timout in ms"),
         )
 }
-
 
 pub struct KafkaArchive {
     producer: FutureProducer,
-    topic: String
+    topic: String,
 }
 
 impl KafkaArchive {
-
     pub fn new(brokers: &str, topic: &str, message_timeout: &str) -> Self {
         KafkaArchive {
             producer: ClientConfig::new()
@@ -75,22 +75,22 @@ impl KafkaArchive {
                 .set("message.timeout.ms", message_timeout)
                 .create()
                 .expect("Cannot create Kafka producer. Aborting."),
-            topic: topic.to_owned()
+            topic: topic.to_owned(),
         }
     }
 
     pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
-        info!("Using Kafka archival, talking to {} on topic {}",
+        info!(
+            "Using Kafka archival, talking to {} on topic {}",
             matches.value_of("brokers").unwrap(),
             matches.value_of("topic").unwrap()
         );
         Ok(KafkaArchive::new(
             matches.value_of("brokers").unwrap(),
             matches.value_of("topic").unwrap(),
-            matches.value_of("message_timeout").unwrap()
+            matches.value_of("message_timeout").unwrap(),
         ))
     }
-
 }
 
 #[derive(Serialize, Deserialize)]
@@ -100,7 +100,6 @@ struct JobInfo {
     pub script: String,
     pub environment: HashMap<String, String>,
 }
-
 
 impl Archive for KafkaArchive {
     fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
@@ -121,23 +120,20 @@ impl Archive for KafkaArchive {
 
         if let Ok(serial) = serde_json::to_string(&doc) {
             self.producer
-                .send::<str, str>(
-                    FutureRecord::to(&self.topic)
-                        .payload(&serial),
-                    0)
+                .send::<str, str>(FutureRecord::to(&self.topic).payload(&serial), 0)
                 .map(move |delivery_status| {
                     debug!("Kafka delivery status received for message: {}", serial);
                     delivery_status
                 });
         }
 
-/*
-                .map(move |delivery_status| {
-                    // This will be executed onw the result is received
-                    info!("Delivery status for message {} received", i);
-                    delivery_status
-                })
-*/
+        /*
+                        .map(move |delivery_status| {
+                            // This will be executed onw the result is received
+                            info!("Delivery status for message {} received", i);
+                            delivery_status
+                        })
+        */
 
         Ok(())
     }

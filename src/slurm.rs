@@ -20,9 +20,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 use log::debug;
-use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 /// Representation of an entry in the Slurm job spool hash directories
@@ -66,7 +66,6 @@ impl SlurmJobEntry {
             .collect()
     }
 }
-
 
 /// Verifies that the path metioned in the event is a that of a file that
 /// needs archival
@@ -122,4 +121,5 @@ mod tests {
         assert_eq!(hm.len(), 46);
         assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
         assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
-    }}
+    }
+}

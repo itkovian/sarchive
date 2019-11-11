@@ -113,7 +113,6 @@ fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
     Ok(())
 }
 
-
 impl ElasticArchive {
     pub fn new(host: &str, port: u16, index: String) -> Self {
         let client = SyncClientBuilder::new()
@@ -191,5 +190,4 @@ mod tests {
     use super::*;
     use std::env;
     use std::path::PathBuf;
-
 }
