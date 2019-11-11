@@ -21,6 +21,8 @@ SOFTWARE.
 */
 use log::debug;
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
+use std::fs;
 use std::time::Instant;
 
 /// Representation of an entry in the Slurm job spool hash directories
@@ -41,7 +43,30 @@ impl SlurmJobEntry {
             moment: Instant::now(),
         }
     }
+
+    pub fn read_script(&self) -> String {
+        fs::read_to_string(self.path.join("script"))
+            .unwrap_or_else(|_| panic!("Could not read file {:?}/script", self.path))
+    }
+
+    pub fn read_env(&self) -> HashMap<String, String> {
+        let s = fs::read_to_string(self.path.join("environment"))
+            .unwrap_or_else(|_| panic!("Could not read file {:?}/environment", self.path));
+
+        s.split('\0')
+            .filter(|s| !s.is_empty())
+            .map(|s| {
+                let ps: Vec<_> = s.split('=').collect();
+                if ps.len() == 2 {
+                    (ps[0].to_owned(), ps[1].to_owned())
+                } else {
+                    (s.to_owned(), String::from(""))
+                }
+            })
+            .collect()
+    }
 }
+
 
 /// Verifies that the path metioned in the event is a that of a file that
 /// needs archival
@@ -87,4 +112,14 @@ mod tests {
         let _faildir = create_dir(&fdir);
         assert_eq!(is_job_path(&fdir), None);
     }
-}
+
+    #[test]
+    fn test_read_env() {
+        let path = PathBuf::from("tests/job.123456");
+        let slurm_job_entry = SlurmJobEntry::new(&path, "123456");
+        let hm = slurm_job_entry.read_env();
+
+        assert_eq!(hm.len(), 46);
+        assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
+        assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
+    }}

@@ -24,10 +24,13 @@ use super::Archive;
 use crate::slurm::SlurmJobEntry;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
+use futures::future::Future;
+use log::{debug, error, info};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::util::get_rdkafka_version;
-use log::{debug, error, info};
+use serde::{Deserialize, Serialize};
+use serde_json;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Error;
@@ -77,7 +80,10 @@ impl KafkaArchive {
     }
 
     pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
-        info!("Using ElasticSearch archival");
+        info!("Using Kafka archival, talking to {} on topic {}",
+            matches.value_of("brokers").unwrap(),
+            matches.value_of("topic").unwrap()
+        );
         Ok(KafkaArchive::new(
             matches.value_of("brokers").unwrap(),
             matches.value_of("topic").unwrap(),
@@ -87,9 +93,52 @@ impl KafkaArchive {
 
 }
 
+#[derive(Serialize, Deserialize)]
+struct JobInfo {
+    pub id: String,
+    pub timestamp: DateTime<Utc>,
+    pub script: String,
+    pub environment: HashMap<String, String>,
+}
+
 
 impl Archive for KafkaArchive {
     fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+        debug!(
+            "Kafka archiver, received an entry for job ID {:?}",
+            slurm_job_entry.jobid
+        );
+
+        let script = slurm_job_entry.read_script();
+        let env = slurm_job_entry.read_env();
+
+        let doc = JobInfo {
+            id: slurm_job_entry.jobid.to_owned(),
+            timestamp: Utc::now(),
+            script,
+            environment: env,
+        };
+
+        if let Ok(serial) = serde_json::to_string(&doc) {
+            self.producer
+                .send::<str, str>(
+                    FutureRecord::to(&self.topic)
+                        .payload(&serial),
+                    0)
+                .map(move |delivery_status| {
+                    debug!("Kafka delivery status received for message: {}", serial);
+                    delivery_status
+                });
+        }
+
+/*
+                .map(move |delivery_status| {
+                    // This will be executed onw the result is received
+                    info!("Delivery status for message {} received", i);
+                    delivery_status
+                })
+*/
+
         Ok(())
     }
 }
