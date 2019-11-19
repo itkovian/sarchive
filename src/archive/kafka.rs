@@ -31,7 +31,7 @@ use rdkafka::producer::{FutureProducer, FutureRecord};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 
 pub fn clap_subcommand(command: &str) -> App {
     SubCommand::with_name(command)
@@ -122,16 +122,10 @@ impl Archive for KafkaArchive {
                     debug!("Kafka delivery status received for message: {}", serial);
                     delivery_status
                 });
+            Ok(())
+        } else {
+            Err(Error::new(ErrorKind::InvalidData, "Cannot convert job info to JSON"))
         }
 
-        /*
-                        .map(move |delivery_status| {
-                            // This will be executed onw the result is received
-                            info!("Delivery status for message {} received", i);
-                            delivery_status
-                        })
-        */
-
-        Ok(())
     }
 }
