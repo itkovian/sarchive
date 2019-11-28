@@ -16,28 +16,26 @@ travis-ci = { repository = "itkovian/sarchive" }
 coveralls = { repository = "itkovian/sarchive" }
 
 [dependencies]
-chrono = { version = "0.4.7", features = ["serde"] }
+chrono = { version = "0.4.10", features = ["serde"] }
 clap = "2.33"
-crossbeam = "0.7.2"
-crossbeam-channel = "0.3.9"
-crossbeam-queue = "0.1.2"
-crossbeam-utils = "0.6.6"
+crossbeam = "0.7.3"
+crossbeam-channel = "0.4.0"
+crossbeam-queue = "0.2.0"
+crossbeam-utils = "0.7.0"
 fern = { version = "0.5.9", features = ["reopen-03"]}
-futures = "0.1.28"
+futures = "^0.1"
 #notify = "5.0.0-pre.1"
 notify = { git = "https://github.com/passcod/notify", rev = "e04ec0236b2" }  # following latest main branch
 libc = "0.2.60"
 log = "^0.4"
 reopen = "^0.3.0"
-syslog = "4.0.1"
-signal-hook = "^0.1.10"
+signal-hook = "^0.1.12"
 
 elastic = { version = "~0.21.0-pre.5", optional = true }
 elastic_derive = { version = "~0.21.0-pre.5", optional = true }
-serde = { version = "~1", features = ["derive"], optional = true }
-serde_derive = { version = "~1", optional = true }
-serde_json = { version = "~1", optional = true }
-
+serde = { version = "^1.0.103", features = ["derive"], optional = true }
+serde_derive = { version = "^1.0.103", optional = true }
+serde_json = { version = "^1.0.42", optional = true }
 rdkafka = { git = "https://github.com/fede1024/rust-rdkafka", rev = "46f9a0a", optional = true }
 
 [features]
