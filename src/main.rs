@@ -33,7 +33,7 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 
 mod archive;
-mod slurm;
+mod scheduler;
 mod utils;
 
 #[cfg(feature = "elasticsearch-7")]

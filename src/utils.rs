@@ -35,7 +35,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 
-use super::slurm;
+use super::scheduler::slurm;
 use crate::archive;
 
 /// The check_and_queue function verifies that the inotify event pertains

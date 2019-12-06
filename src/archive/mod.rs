@@ -28,7 +28,7 @@ pub mod kafka;
 
 #[cfg(feature = "elasticsearch-7")]
 use self::elastic::ElasticArchive;
-use super::slurm;
+use super::scheduler::slurm;
 use clap::ArgMatches;
 use file::FileArchive;
 #[cfg(feature = "kafka")]

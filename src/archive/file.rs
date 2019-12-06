@@ -27,7 +27,7 @@ use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::Duration;
 
-use super::super::slurm::SlurmJobEntry;
+use super::super::scheduler::slurm::SlurmJobEntry;
 use super::Archive;
 
 /// Command line options for the file archiver subcommand
