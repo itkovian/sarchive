@@ -21,7 +21,8 @@ SOFTWARE.
 */
 
 use super::Archive;
-use crate::slurm::SlurmJobEntry;
+use crate::scheduler::slurm::SlurmJobEntry;
+use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elastic_derive::ElasticType;
@@ -131,7 +132,7 @@ impl ElasticArchive {
         }
 
         // Put the mapping once at the start of the application
-        //if let Err(e) = client.document::<JobInfo>().put_mapping().send() {
+        //if let Err(e) = client.document::<JobMessage>().put_mapping().send() {
         //    error!("Cannot put mapping for jobinfo document");
         //    exit(1);
         //}
@@ -153,20 +154,17 @@ impl ElasticArchive {
 }
 
 impl Archive for ElasticArchive {
-    fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+    fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         debug!(
-            "ES archiver, received an entry for job ID {:?}",
-            slurm_job_entry.jobid
+            "ES archiver, received an entry for job ID {}",
+            job_entry.jobid()
         );
 
-        let script = slurm_job_entry.read_script();
-        let env = slurm_job_entry.read_env();
-
-        let doc = JobInfo {
-            id: slurm_job_entry.jobid.to_owned(),
+        let doc = JobMessage {
+            id: job_entry.jobid().to_owned(),
             timestamp: Utc::now(),
-            script,
-            environment: env,
+            script: job_entry.script().to_owned(),
+            environment: job_entry.extra_info().to_owned(),
         };
         let _res = self.client.document().index(doc).send().unwrap();
 
@@ -176,12 +174,12 @@ impl Archive for ElasticArchive {
 
 #[cfg(feature = "elasticsearch-7")]
 #[derive(Serialize, Deserialize, ElasticType)]
-struct JobInfo {
+struct JobMessage {
     #[elastic(id)]
     pub id: String,
     pub timestamp: DateTime<Utc>,
     pub script: String,
-    pub environment: HashMap<String, String>,
+    pub environment: Option<HashMap<String, String>>,
 }
 
 #[cfg(test)]

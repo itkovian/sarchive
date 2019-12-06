@@ -21,7 +21,8 @@ SOFTWARE.
 */
 
 use super::Archive;
-use crate::slurm::SlurmJobEntry;
+use crate::scheduler::slurm::SlurmJobEntry;
+use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use futures::future::Future;
@@ -91,28 +92,25 @@ impl KafkaArchive {
 }
 
 #[derive(Serialize, Deserialize)]
-struct JobInfo {
+struct JobMessage {
     pub id: String,
     pub timestamp: DateTime<Utc>,
     pub script: String,
-    pub environment: HashMap<String, String>,
+    pub environment: Option<HashMap<String, String>>,
 }
 
 impl Archive for KafkaArchive {
-    fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+    fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         debug!(
-            "Kafka archiver, received an entry for job ID {:?}",
-            slurm_job_entry.jobid
+            "Kafka archiver, received an entry for job ID {}",
+            job_entry.jobid()
         );
 
-        let script = slurm_job_entry.read_script();
-        let env = slurm_job_entry.read_env();
-
-        let doc = JobInfo {
-            id: slurm_job_entry.jobid.to_owned(),
+        let doc = JobMessage {
+            id: job_entry.jobid().to_owned(),
             timestamp: Utc::now(),
-            script,
-            environment: env,
+            script: job_entry.script().to_owned(),
+            environment: job_entry.extra_info().to_owned(),
         };
 
         if let Ok(serial) = serde_json::to_string(&doc) {

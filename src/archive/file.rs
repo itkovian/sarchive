@@ -21,13 +21,14 @@ SOFTWARE.
 */
 use clap::{App, Arg, ArgMatches, SubCommand};
 use log::{debug, error, info, warn};
-use std::fs::{copy, create_dir_all};
-use std::io::Error;
+use std::fs::{copy, create_dir_all, File};
+use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::Duration;
 
-use super::super::scheduler::slurm::SlurmJobEntry;
+use crate::scheduler::slurm::SlurmJobEntry;
+use crate::scheduler::job::JobInfo;
 use super::Archive;
 
 /// Command line options for the file archiver subcommand
@@ -126,17 +127,23 @@ impl Archive for FileArchive {
     /// and return without copying.
     /// If the directory dissapears before we found or copied the files,
     /// we panic.
-    fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+    fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         // Simulate the debounced event we had before. Wait two seconds after dir creation event to
         // have some assurance the files will have been written.
-        if slurm_job_entry.moment.elapsed().as_secs() < 2 {
-            sleep(Duration::from_millis(2000) - slurm_job_entry.moment.elapsed());
+        if job_entry.moment().elapsed().as_secs() < 2 {
+            sleep(Duration::from_millis(2000) - job_entry.moment().elapsed());
         }
         let ten_millis = Duration::from_millis(10);
         // We wait for each file to be present
 
         let archive_path = &self.archive_path;
         let p = &self.period;
+
+        // FIXME: this should not be implemented here!
+        //        rather, this is the jurisdiction of the
+        //        scheduler/job info instance to get the
+        //        required information
+        /*
         for filename in &["script", "environment"] {
             let fpath = slurm_job_entry.path.join(filename);
             let mut iters = 100;
@@ -169,6 +176,13 @@ impl Archive for FileArchive {
                     return Err(e);
                 }
             };
+        }*/
+        let target_path = determine_target_path(&archive_path, &p);
+        debug!("Target path: {:?}", target_path);
+        for (fname, fcontents) in job_entry.files().iter() {
+            debug!("Creating an entry for {}", fname);
+            let mut f = File::create(target_path.join(&fname))?;
+            f.write_all(fcontents.as_bytes())?;
         }
 
         Ok(())
@@ -183,12 +197,9 @@ impl Archive for FileArchive {
 ///     - YYYY in case of a Yearly Period
 ///     - YYYYMM in case of a Monthly Period
 ///     - YYYYMMDD in case of a Daily Period
-/// - a file with the given filename
 fn determine_target_path(
     archive_path: &Path,
     p: &Period,
-    slurm_job_entry: &SlurmJobEntry,
-    filename: &str,
 ) -> PathBuf {
     let archive_subdir = match p {
         Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
@@ -204,11 +215,9 @@ fn determine_target_path(
                 debug!("Archive subdir {:?} does not yet exist, creating", &d);
                 create_dir_all(&archive_subdir_path).unwrap();
             }
-            archive_subdir_path
-                .clone()
-                .join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename))
-        }
-        None => archive_path.join(format!("job.{}_{}", &slurm_job_entry.jobid, &filename)),
+            archive_subdir_path.clone()
+        },
+        None => archive_path.to_path_buf()
     }
 }
 

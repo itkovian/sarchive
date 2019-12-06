@@ -22,7 +22,8 @@ SOFTWARE.
 
 use chrono;
 use clap::{App, Arg, ArgMatches};
-use crossbeam_channel::{bounded, unbounded};
+use crossbeam_channel::{bounded, unbounded, Sender};
+use crossbeam_utils::Backoff;
 use crossbeam_utils::sync::{Parker, Unparker};
 use crossbeam_utils::thread::scope;
 use log::{error, info};
@@ -34,15 +35,17 @@ use std::sync::Arc;
 
 mod archive;
 mod scheduler;
-mod utils;
+mod monitor;
 
 #[cfg(feature = "elasticsearch-7")]
 use archive::elastic as el;
 use archive::file;
 #[cfg(feature = "kafka")]
 use archive::kafka as kf;
-use archive::{archive_builder, Archive};
-use utils::{monitor, process, signal_handler_atomic};
+use archive::{archive_builder, Archive, process};
+use monitor::monitor;
+use scheduler::Scheduler;
+use scheduler::slurm::Slurm;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -130,6 +133,22 @@ fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<
     };
 }
 
+pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
+    let backoff = Backoff::new();
+    while !sig.load(SeqCst) {
+        if backoff.is_completed() {
+            p.park();
+        } else {
+            backoff.snooze();
+        }
+    }
+    for _ in 0..20 {
+        sender.send(true).unwrap();
+    }
+    info!("Sent 20 notifications");
+}
+
+
 fn main() {
     let matches = args();
 
@@ -178,7 +197,8 @@ fn main() {
             let t = &sender;
             let h = hash;
             let sr = &sig_receiver;
-            s.spawn(move |_| match monitor(base, hash, t, sr) {
+            let sl = Slurm::new(&base.to_path_buf());
+            s.spawn(move |_| match monitor(&sl, base, hash, t, sr) {
                 Ok(_) => info!("Stopped watching hash.{}", &h),
                 Err(e) => {
                     error!("{}", e);
