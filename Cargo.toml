@@ -3,7 +3,7 @@ name = "sarchive"
 version = "0.9.3"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2018"
-description = "Archiving tool for slurm job scripts"
+description = "Archival tool for slurm job scripts"
 license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/itkovian/sarchive"
@@ -24,6 +24,7 @@ crossbeam-queue = "0.2.0"
 crossbeam-utils = "0.7.0"
 fern = { version = "0.5.9", features = ["reopen-03"]}
 futures = "^0.1"
+#futures = "^0.3"
 #notify = "5.0.0-pre.1"
 notify = { git = "https://github.com/passcod/notify", rev = "e04ec0236b2" }  # following latest main branch
 libc = "0.2.60"
@@ -37,6 +38,7 @@ serde = { version = "^1.0.103", features = ["derive"], optional = true }
 serde_derive = { version = "^1.0.103", optional = true }
 serde_json = { version = "^1.0.42", optional = true }
 rdkafka = { git = "https://github.com/fede1024/rust-rdkafka", rev = "46f9a0a", optional = true }
+#rdkafka = { git = "https://github.com/dbcfd/rust-rdkafka", rev = "96009ad", optional = true }
 
 [features]
 elasticsearch-7 = ["elastic", "elastic_derive", "serde", "serde_derive", "serde_json"]
