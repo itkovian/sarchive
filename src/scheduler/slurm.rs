@@ -24,8 +24,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
 use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 use super::job::JobInfo;
 use super::Scheduler;
@@ -33,7 +33,7 @@ use super::Scheduler;
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
     /// The full path to the file that needs to be archived
-    path_: PathBuf,
+    pub path_: PathBuf,
     /// The job ID
     jobid_: String,
     /// Time of event notification and instance creation
@@ -65,15 +65,21 @@ fn read_file(path: &Path, filename: &str) -> Result<String, Error> {
         sleep(ten_millis);
         if !Path::exists(&path) {
             debug!("Job directory {:?} no longer exists", &path);
-            return Err(Error::new(ErrorKind::NotFound, format!("Job directory {:?} no longer exists", &path)));
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("Job directory {:?} no longer exists", &path),
+            ));
         }
         iters -= 1;
     }
     match iters {
         0 => {
             warn!("Timeout waiting for {:?} to appear", &fpath);
-            Err(Error::new(ErrorKind::NotFound, format!("File {:?} did not appear after waiting 1s", &fpath)))
-        },
+            Err(Error::new(
+                ErrorKind::NotFound,
+                format!("File {:?} did not appear after waiting 1s", &fpath),
+            ))
+        }
         _ => {
             let data = fs::read_to_string(&fpath)?;
             Ok(data)
@@ -82,54 +88,59 @@ fn read_file(path: &Path, filename: &str) -> Result<String, Error> {
 }
 
 impl JobInfo for SlurmJobEntry {
+    fn jobid(&self) -> String {
+        self.jobid_.clone()
+    }
 
-    fn jobid(&self) -> String { self.jobid_.clone() }
-
-    fn moment(&self) -> Instant { self.moment_ }
+    fn moment(&self) -> Instant {
+        self.moment_
+    }
 
     fn read_job_info(&mut self) -> Result<(), Error> {
-
         self.script_ = Some(read_file(&self.path_, "script")?);
 
         let s = read_file(&self.path_, "environment")?;
-        self.env_ = Some(s.split('\0')
-            .filter(|s| !s.is_empty())
-            .map(|s| {
-                let ps: Vec<_> = s.split('=').collect();
-                if ps.len() == 2 {
-                    (ps[0].to_owned(), ps[1].to_owned())
-                } else {
-                    (s.to_owned(), String::from(""))
-                }
-            })
-            .collect());
+        self.env_ = Some(
+            s.split('\0')
+                .filter(|s| !s.is_empty())
+                .map(|s| {
+                    let ps: Vec<_> = s.split('=').collect();
+                    if ps.len() == 2 {
+                        (ps[0].to_owned(), ps[1].to_owned())
+                    } else {
+                        (s.to_owned(), String::from(""))
+                    }
+                })
+                .collect(),
+        );
         Ok(())
     }
 
     fn files(&self) -> Vec<(String, String)> {
-
         if let Some(s) = &self.script_ {
             vec![
                 (format!("job.{}_script", self.jobid_), s.to_string()),
-                (format!("job.{}_environment", self.jobid_), format!("{:?}", self.env_))
+                (
+                    format!("job.{}_environment", self.jobid_),
+                    format!("{:?}", self.env_),
+                ),
             ]
-        } else  {
+        } else {
             Vec::new()
         }
-
     }
 
     fn script(&self) -> String {
         match &self.script_ {
             Some(s) => s.clone(),
-            None => panic!("No script available for job {}", self.jobid_)
+            None => panic!("No script available for job {}", self.jobid_),
         }
     }
 
-    fn extra_info(&self) -> Option<&HashMap<String, String>> { self.env_.as_ref() }
-
+    fn extra_info(&self) -> Option<HashMap<String, String>> {
+        self.env_.clone()
+    }
 }
-
 
 pub struct Slurm {
     pub base: PathBuf,
@@ -142,17 +153,16 @@ impl Slurm {
 }
 
 impl Scheduler for Slurm {
-
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
-
         if let Some((jobid, _dirname)) = is_job_path(&event_path) {
-            Some(Box::new(SlurmJobEntry::new(&event_path.to_path_buf(), jobid)))
+            Some(Box::new(SlurmJobEntry::new(
+                &event_path.to_path_buf(),
+                jobid,
+            )))
         } else {
             None
         }
-
     }
-
 }
 
 /// Verifies that the path metioned in the event is a that of a file that
@@ -182,6 +192,7 @@ pub fn is_job_path(path: &Path) -> Option<(&str, &str)> {
 mod tests {
 
     use super::*;
+    use std::env::current_dir;
     use std::fs::create_dir;
     use tempfile::tempdir;
 
@@ -201,13 +212,17 @@ mod tests {
     }
 
     #[test]
-    fn test_read_env() {
-        let path = PathBuf::from("tests/job.123456");
-        let slurm_job_entry = SlurmJobEntry::new(&path, "123456");
-        let hm = slurm_job_entry.read_env();
+    fn test_read_job_info() {
+        let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456");
+        slurm_job_entry.read_job_info().unwrap();
 
-        assert_eq!(hm.len(), 46);
-        assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
-        assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
+        if let Some(hm) = slurm_job_entry.extra_info() {
+            assert_eq!(hm.len(), 46);
+            assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
+            assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
+        } else {
+            assert!(false);
+        }
     }
 }

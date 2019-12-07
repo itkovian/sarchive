@@ -22,11 +22,9 @@ SOFTWARE.
 
 use std::collections::HashMap;
 use std::io::Error;
-use std::path::Path;
 use std::time::Instant;
 
 pub trait JobInfo: Send {
-
     // Return the job ID
     fn jobid(&self) -> String;
 
@@ -46,5 +44,8 @@ pub trait JobInfo: Send {
     fn script(&self) -> String;
 
     // Return additional information as a set of key-value pairs
-    fn extra_info(&self) -> Option<&HashMap<String, String>>;
+    fn extra_info(&self) -> Option<HashMap<String, String>>;
 }
+
+#[cfg(test)]
+mod tests {}

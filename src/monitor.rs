@@ -30,22 +30,26 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::io::Error;
 use std::path::Path;
 
-use super::scheduler::slurm;
-use super::scheduler::Scheduler;
 use super::scheduler::job::JobInfo;
+use super::scheduler::Scheduler;
 
 /// The check_and_queue function verifies that the inotify event pertains
 /// and actual Slurm job entry and pushes the correct information to the
 /// channel so it can be processed later on.
-fn check_and_queue(scheduler: &dyn Scheduler, s: &Sender<Box<dyn JobInfo>>, event: Event) -> Result<(), Error> {
+#[allow(clippy::borrowed_box)]
+fn check_and_queue(
+    scheduler: &Box<dyn Scheduler>,
+    s: &Sender<Box<dyn JobInfo>>,
+    event: Event,
+) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
+    // FIXME: This is still slurm-specific.
     if let Event {
         kind: EventKind::Create(CreateKind::Folder),
         paths,
         ..
     } = event
     {
-        debug!("Received event for path {:?}", &paths[0]);
         if let Some(jobinfo) = scheduler.create_job_info(&paths[0]) {
             debug!("Sending jobinfo");
             s.send(jobinfo).unwrap();
@@ -58,8 +62,9 @@ fn check_and_queue(scheduler: &dyn Scheduler, s: &Sender<Box<dyn JobInfo>>, even
 /// the given path, formed by joining the base and the hash path.
 /// At the same time, it check for a notification indicating that it should stop operations
 /// upon receipt of which it immediately returns.
+#[allow(clippy::borrowed_box)]
 pub fn monitor(
-    scheduler: &dyn Scheduler,
+    scheduler: Box<dyn Scheduler>,
     base: &Path,
     hash: u8,
     s: &Sender<Box<dyn JobInfo>>,
@@ -84,7 +89,7 @@ pub fn monitor(
             },
             recv(rx) -> event => {
                 if let Ok(Ok(e)) = event {
-                    check_and_queue(scheduler, s, e)?
+                    check_and_queue(&scheduler, s, e)?
                 } else {
                     error!("Error on received event: {:?}", event);
                     break;
@@ -96,3 +101,5 @@ pub fn monitor(
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {}

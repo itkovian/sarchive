@@ -23,11 +23,24 @@ SOFTWARE.
 pub mod job;
 pub mod slurm;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
 use job::JobInfo;
 
-pub trait Scheduler: Send {
-
-    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
-
+/// Denotes the schedulers SArchive supports
+pub enum SchedulerKind {
+    Slurm,
 }
+
+pub trait Scheduler: Send {
+    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
+}
+
+pub fn create(kind: &SchedulerKind, spool_path: &PathBuf) -> Box<dyn Scheduler> {
+    match kind {
+        SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path)),
+    }
+}
+
+#[cfg(test)]
+mod tests {}

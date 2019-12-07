@@ -21,11 +21,9 @@ SOFTWARE.
 */
 
 use super::Archive;
-use crate::scheduler::slurm::SlurmJobEntry;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
-use futures::future::Future;
 use log::{debug, info};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
@@ -115,15 +113,20 @@ impl Archive for KafkaArchive {
 
         if let Ok(serial) = serde_json::to_string(&doc) {
             self.producer
-                .send::<str, str>(FutureRecord::to(&self.topic).payload(&serial), 0)
-                .map(move |delivery_status| {
-                    debug!("Kafka delivery status received for message: {}", serial);
-                    delivery_status
-                });
+                .send::<str, str>(FutureRecord::to(&self.topic).payload(&serial), 0);
+            /*.map(move |delivery_status| {
+                debug!("Kafka delivery status received for message: {}", serial);
+                delivery_status
+            });*/
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::InvalidData, "Cannot convert job info to JSON"))
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "Cannot convert job info to JSON",
+            ))
         }
-
     }
 }
+
+#[cfg(test)]
+mod tests {}

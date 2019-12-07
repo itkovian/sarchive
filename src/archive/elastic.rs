@@ -21,7 +21,6 @@ SOFTWARE.
 */
 
 use super::Archive;
-use crate::scheduler::slurm::SlurmJobEntry;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
@@ -164,7 +163,7 @@ impl Archive for ElasticArchive {
             id: job_entry.jobid().to_owned(),
             timestamp: Utc::now(),
             script: job_entry.script().to_owned(),
-            environment: job_entry.extra_info().to_owned(),
+            environment: job_entry.extra_info(),
         };
         let _res = self.client.document().index(doc).send().unwrap();
 

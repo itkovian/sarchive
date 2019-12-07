@@ -23,9 +23,9 @@ SOFTWARE.
 use chrono;
 use clap::{App, Arg, ArgMatches};
 use crossbeam_channel::{bounded, unbounded, Sender};
-use crossbeam_utils::Backoff;
 use crossbeam_utils::sync::{Parker, Unparker};
 use crossbeam_utils::thread::scope;
+use crossbeam_utils::Backoff;
 use log::{error, info};
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -34,18 +34,17 @@ use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 
 mod archive;
-mod scheduler;
 mod monitor;
+mod scheduler;
 
 #[cfg(feature = "elasticsearch-7")]
 use archive::elastic as el;
 use archive::file;
 #[cfg(feature = "kafka")]
 use archive::kafka as kf;
-use archive::{archive_builder, Archive, process};
+use archive::{archive_builder, process, Archive};
 use monitor::monitor;
-use scheduler::Scheduler;
-use scheduler::slurm::Slurm;
+use scheduler::{create, SchedulerKind};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -100,6 +99,14 @@ fn args<'a>() -> ArgMatches<'a> {
                 )
         )
         .arg(
+            Arg::with_name("scheduler")
+                .long("scheduler")
+                .takes_value(true)
+                .default_value("slurm")
+                .possible_values(&["slurm"])
+                .help("Supported schedulers")
+        )
+        .arg(
             Arg::with_name("spool")
                 .long("spool")
                 .short("s")
@@ -148,7 +155,6 @@ pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Pa
     info!("Sent 20 notifications");
 }
 
-
 fn main() {
     let matches = args();
 
@@ -164,16 +170,21 @@ fn main() {
     let base = Path::new(
         matches
             .value_of("spool")
-            .expect("You must provide the location of the hash dirs."),
+            .expect("You must provide the location of the spool dir."),
     );
+    // FIXME: Check for permissions to read directory contents
     if !base.is_dir() {
-        error!("Provided base {:?} is not a valid directory", base);
+        error!("Provided spool {:?} is not a valid directory", base);
         exit(1);
     }
 
+    let scheduler_kind = match matches.value_of("scheduler") {
+        Some("slurm") => SchedulerKind::Slurm,
+        _ => panic!("Unsupported scheduler"), // This should have been handled by clap, so never arrive here
+    };
     let archiver: Box<dyn Archive> = archive_builder(&matches).unwrap();
 
-    info!("sarchive starting. Watching hash dirs in {:?}.", &base);
+    info!("sarchive starting. Watching spool {:?}.", &base);
 
     let notification = Arc::new(AtomicBool::new(false));
     let parker = Parker::new();
@@ -197,8 +208,8 @@ fn main() {
             let t = &sender;
             let h = hash;
             let sr = &sig_receiver;
-            let sl = Slurm::new(&base.to_path_buf());
-            s.spawn(move |_| match monitor(&sl, base, hash, t, sr) {
+            let sl = create(&scheduler_kind, &base.to_path_buf());
+            s.spawn(move |_| match monitor(sl, base, hash, t, sr) {
                 Ok(_) => info!("Stopped watching hash.{}", &h),
                 Err(e) => {
                     error!("{}", e);
