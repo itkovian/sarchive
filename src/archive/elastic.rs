@@ -21,7 +21,7 @@ SOFTWARE.
 */
 
 use super::Archive;
-use crate::slurm::SlurmJobEntry;
+use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use elastic_derive::ElasticType;
@@ -29,7 +29,6 @@ use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
-use std::fs;
 use std::io::Error;
 use std::process::exit;
 
@@ -114,30 +113,6 @@ fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
     Ok(())
 }
 
-impl SlurmJobEntry {
-    pub fn read_script(&self) -> String {
-        fs::read_to_string(self.path.join("script"))
-            .unwrap_or_else(|_| panic!("Could not read file {:?}/script", self.path))
-    }
-
-    pub fn read_env(&self) -> HashMap<String, String> {
-        let s = fs::read_to_string(self.path.join("environment"))
-            .unwrap_or_else(|_| panic!("Could not read file {:?}/environment", self.path));
-
-        s.split('\0')
-            .filter(|s| !s.is_empty())
-            .map(|s| {
-                let ps: Vec<_> = s.split('=').collect();
-                if ps.len() == 2 {
-                    (ps[0].to_owned(), ps[1].to_owned())
-                } else {
-                    (s.to_owned(), String::from(""))
-                }
-            })
-            .collect()
-    }
-}
-
 impl ElasticArchive {
     pub fn new(host: &str, port: u16, index: String) -> Self {
         let client = SyncClientBuilder::new()
@@ -156,7 +131,7 @@ impl ElasticArchive {
         }
 
         // Put the mapping once at the start of the application
-        //if let Err(e) = client.document::<JobInfo>().put_mapping().send() {
+        //if let Err(e) = client.document::<JobMessage>().put_mapping().send() {
         //    error!("Cannot put mapping for jobinfo document");
         //    exit(1);
         //}
@@ -178,20 +153,17 @@ impl ElasticArchive {
 }
 
 impl Archive for ElasticArchive {
-    fn archive(&self, slurm_job_entry: &SlurmJobEntry) -> Result<(), Error> {
+    fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         debug!(
-            "ES archiver, received an entry for job ID {:?}",
-            slurm_job_entry.jobid
+            "ES archiver, received an entry for job ID {}",
+            job_entry.jobid()
         );
 
-        let script = slurm_job_entry.read_script();
-        let env = slurm_job_entry.read_env();
-
-        let doc = JobInfo {
-            id: slurm_job_entry.jobid.to_owned(),
+        let doc = JobMessage {
+            id: job_entry.jobid().to_owned(),
             timestamp: Utc::now(),
-            script,
-            environment: env,
+            script: job_entry.script().to_owned(),
+            environment: job_entry.extra_info(),
         };
         let _res = self.client.document().index(doc).send().unwrap();
 
@@ -201,12 +173,12 @@ impl Archive for ElasticArchive {
 
 #[cfg(feature = "elasticsearch-7")]
 #[derive(Serialize, Deserialize, ElasticType)]
-struct JobInfo {
+struct JobMessage {
     #[elastic(id)]
     pub id: String,
     pub timestamp: DateTime<Utc>,
     pub script: String,
-    pub environment: HashMap<String, String>,
+    pub environment: Option<HashMap<String, String>>,
 }
 
 #[cfg(test)]
@@ -215,15 +187,4 @@ mod tests {
     use super::*;
     use std::env;
     use std::path::PathBuf;
-
-    #[test]
-    fn test_read_env() {
-        let path = PathBuf::from("tests/job.123456");
-        let slurm_job_entry = SlurmJobEntry::new(&path, "123456");
-        let hm = slurm_job_entry.read_env();
-
-        assert_eq!(hm.len(), 46);
-        assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
-        assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
-    }
 }
