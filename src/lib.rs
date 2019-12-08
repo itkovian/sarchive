@@ -27,14 +27,14 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::Backoff;
 use log::*;
-use notify::{Op, RawEvent, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::event::{Event, EventKind, AccessKind, AccessMode};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
-use std::time::Duration;
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct TorqueJobEntry    {
@@ -148,12 +148,12 @@ fn archive(archive_path: &Path, p: &Period, job_entry: &TorqueJobEntry) -> Resul
     Ok(())
 }
 
-fn check_and_queue(s: &Sender<TorqueJobEntry>, event: RawEvent) -> Result<(), Error> {
+fn check_and_queue(s: &Sender<TorqueJobEntry>, event: Event) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
     match event {
-        RawEvent{path: Some(path), op: Ok(Op::CLOSE_WRITE), cookie} => {
-            if let Some((jobid, _dirname, file_type)) = is_job_path(&path) {
-                let e = TorqueJobEntry::new(&path, jobid, &file_type);
+        Event{kind: EventKind::Access(AccessKind::Close(AccessMode::Write)), paths, attrs} => {
+            if let Some((jobid, _dirname, file_type)) = is_job_path(&paths[0]) {
+                let e = TorqueJobEntry::new(&paths[0], jobid, &file_type);
                 s.send(e).unwrap();
             };
         }
@@ -178,13 +178,13 @@ pub fn monitor(path: &Path, s: &Sender<TorqueJobEntry>) -> notify::Result<()> {
                 debug!("Monitor received signal, stopping execution");
                 return Ok(());
             },
-            recv(rx) -> event => { match event {
-                Ok(e) => check_and_queue(s, e)?,
-                Err(e) => {
-                    error!("Error on received event: {:?}", e);
+            recv(rx) -> event => {
+                if let Ok(Ok(e)) = event { check_and_queue(s, e)? }
+                else {
+                    error!("Error on received event: {:?}", &event);
                     break;
                 }
-            };}
+            }
         }
     }
 
