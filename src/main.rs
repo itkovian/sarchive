@@ -119,7 +119,7 @@ fn args<'a>() -> ArgMatches<'a> {
                 .short("s")
                 .takes_value(true)
                 .help(
-                    "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
+                    "Location of the Torque job spool (where the job scripts and XML files are kept).",
                 )
         )
         .subcommand(file::clap_subcommand("file"));
@@ -218,7 +218,8 @@ fn main() {
                 let t = &sender;
                 let sd = subdir;
                 let p = base.join(format!("{}", subdir)).to_owned();
-                s.spawn(move |_| match monitor(&p, &t) {
+                let sr = &sig_receiver;
+                s.spawn(move |_| match monitor(&p, &t, sr) {
                     Ok(_) => info!("Stopped watching subdir {}", &sd),
                     Err(e) => {
                         error!("{}", e);
@@ -228,7 +229,6 @@ fn main() {
             }
         } else {
             let t = &sender;
-            let h = hash;
             let sr = &sig_receiver;
             let sl = create(&scheduler_kind, &base.to_path_buf());
             s.spawn(move |_| match monitor(sl, base, hash, t, sr) {
