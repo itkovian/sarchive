@@ -23,9 +23,11 @@ extern crate chrono;
 extern crate crossbeam_channel;
 extern crate crossbeam_utils;
 
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{select, unbounded, Receiver, Sender};
+use crossbeam_utils::sync::Parker;
+use crossbeam_utils::Backoff;
 use log::*;
-use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Op, RawEvent, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fs::{copy, create_dir_all};
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -146,10 +148,10 @@ fn archive(archive_path: &Path, p: &Period, job_entry: &TorqueJobEntry) -> Resul
     Ok(())
 }
 
-fn check_and_queue(s: &Sender<TorqueJobEntry>, event: DebouncedEvent) -> Result<(), Error> {
+fn check_and_queue(s: &Sender<TorqueJobEntry>, event: RawEvent) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
     match event {
-        DebouncedEvent::Create(path) | DebouncedEvent::Write(path) => {
+        RawEvent{path: Some(path), op: Ok(Op::CREATE), cookie} => {
             if let Some((jobid, _dirname, file_type)) = is_job_path(&path) {
                 let e = TorqueJobEntry::new(&path, jobid, &file_type);
                 s.send(e).unwrap();
@@ -165,19 +167,24 @@ pub fn monitor(path: &Path, s: &Sender<TorqueJobEntry>) -> notify::Result<()> {
     let (tx, rx) = channel();
 
     // create a platform-specific watcher
-    let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
+    let mut watcher: RecommendedWatcher = Watcher::new_immediate(tx)?;
 
     info!("Watching path {:?}", &path);
 
     if let Err(e) = watcher.watch(&path, RecursiveMode::NonRecursive) { return Err(e); } 
     loop {
-        match rx.recv() {
-            Ok(event) => check_and_queue(s, event)?,
-            Err(e) => {
-                error!("Error on received event: {:?}", e);
-                break;
-            }
-        };
+        select! {
+            recv(sigchannel) -> b => if let Ok(true) = b  {
+                return Ok(());
+            },
+            recv(rx) -> event => { match event {
+                Ok(e) => check_and_queue(s, e)?,
+                Err(e) => {
+                    error!("Error on received event: {:?}", e);
+                    break;
+                }
+            };}
+        }
     }
 
     Ok(())
@@ -185,14 +192,45 @@ pub fn monitor(path: &Path, s: &Sender<TorqueJobEntry>) -> notify::Result<()> {
 
 pub fn process(archive_path: &Path, p: Period, r: &Receiver<TorqueJobEntry>) {
     loop {
-        match r.recv() {
-            Ok(slurm_job_entry) => archive(&archive_path, &p, &slurm_job_entry),
-            Err(_) => {
-                error!("Error on receiving TorqueJobEntry info");
-                break;
-            }
-        };
-    };
+        select! {
+            recv(sigchannel) -> b => if let Ok(true) = b  {
+                if !cleanup {
+                    info!("Stopped processing entries, {} skipped", r.len());
+                } else {
+                info!("Processing {} entries, then stopping", r.len());
+                r.iter().map(|entry| archive(&archive_path, &p, &entry).unwrap());
+                info!("Done processing");
+                }
+                return;
+            },
+            recv(r) -> entry => { match entry {
+                Ok(job_entry) => archive(&archive_path, &p, &job_entry),
+                Err(_) => {
+                    error!("Error on receiving TorqueJobEntry info");
+                    break;
+                }
+            };}
+        }
+    }
+    debug!("Processing should never get here")
+}
+
+/// This function will park the thread until it is unparked and check the
+/// atomic bool to see if it should start notifying other threads they need
+/// to finish execution.
+pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
+    let backoff = Backoff::new();
+    while !sig.load(SeqCst) {
+        if backoff.is_completed() {
+            p.park();
+        } else {
+            backoff.snooze();
+        }
+    }
+    for _ in 0..20 {
+        sender.send(true);
+    }
+    info!("Sent 20 notifications");
 }
 
 #[cfg(test)]
