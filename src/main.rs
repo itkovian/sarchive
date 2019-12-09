@@ -103,7 +103,7 @@ fn args<'a>() -> ArgMatches<'a> {
                 .long("scheduler")
                 .takes_value(true)
                 .default_value("slurm")
-                .possible_values(&["slurm"])
+                .possible_values(&["slurm", "torque"])
                 .help("Supported schedulers")
         )
         .arg(
@@ -187,6 +187,7 @@ fn main() {
 
     let scheduler_kind = match matches.value_of("scheduler") {
         Some("slurm") => SchedulerKind::Slurm,
+        Some("torque") => SchedulerKind::Torque,
         _ => panic!("Unsupported scheduler"), // This should have been handled by clap, so never arrive here
     };
     let archiver: Box<dyn Archive> = archive_builder(&matches).unwrap();
@@ -205,34 +206,19 @@ fn main() {
 
     // we will watch the ten hash.X directories
     let (sender, receiver) = unbounded();
+    let sched = create(&scheduler_kind, &base.to_path_buf());
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {
             signal_handler_atomic(ss, notification, &parker);
             info!("Signal handled");
         });
-        for hash in 0..10 {
-
-        if matches.is_present("subdirs") {
-            for subdir in 0..9 {
-                let t = &sender;
-                let sd = subdir;
-                let p = base.join(format!("{}", subdir)).to_owned();
-                let sr = &sig_receiver;
-                s.spawn(move |_| match monitor(&p, &t, sr) {
-                    Ok(_) => info!("Stopped watching subdir {}", &sd),
-                    Err(e) => {
-                        error!("{}", e);
-                        panic!("Error watching subdir {}", &sd);
-                    }
-                });
-            }
-        } else {
+        for loc in sched.watch_locations(&matches) {
             let t = &sender;
             let sr = &sig_receiver;
-            let sl = create(&scheduler_kind, &base.to_path_buf());
-            s.spawn(move |_| match monitor(sl, base, hash, t, sr) {
-                Ok(_) => info!("Stopped watching hash.{}", &h),
+            let sl = &sched;
+            s.spawn(move |_| match monitor(sl, &loc, t, sr) {
+                Ok(_) => info!("Stopped watching location {:?}", &loc),
                 Err(e) => {
                         error!("{:?}", e);
                         panic!("Error watching {:?}", &base);

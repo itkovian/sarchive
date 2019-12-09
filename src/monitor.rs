@@ -64,9 +64,8 @@ fn check_and_queue(
 /// upon receipt of which it immediately returns.
 #[allow(clippy::borrowed_box)]
 pub fn monitor(
-    scheduler: Box<dyn Scheduler>,
-    base: &Path,
-    hash: u8,
+    scheduler: &Box<dyn Scheduler>,
+    path: &Path,
     s: &Sender<Box<dyn JobInfo>>,
     sigchannel: &Receiver<bool>,
 ) -> notify::Result<()> {
@@ -74,7 +73,6 @@ pub fn monitor(
 
     // create a platform-specific watcher
     let mut watcher = RecommendedWatcher::new_immediate(move |res| tx.send(res).unwrap())?;
-    let path = base.join(format!("hash.{}", hash));
 
     info!("Watching path {:?}", &path);
 

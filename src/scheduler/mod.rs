@@ -22,7 +22,9 @@ SOFTWARE.
 
 pub mod job;
 pub mod slurm;
+pub mod torque;
 
+use clap::ArgMatches;
 use std::path::{Path, PathBuf};
 
 use job::JobInfo;
@@ -30,16 +32,19 @@ use job::JobInfo;
 /// Denotes the schedulers SArchive supports
 pub enum SchedulerKind {
     Slurm,
+    Torque,
 }
 
-pub trait Scheduler: Send {
+pub trait Scheduler: Send + Sync {
+    fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf>;
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
 }
 
 pub fn create(kind: &SchedulerKind, spool_path: &PathBuf) -> Box<dyn Scheduler> {
     match kind {
         SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path)),
-    }
+        SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path)),
+}
 }
 
 #[cfg(test)]

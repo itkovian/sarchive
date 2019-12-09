@@ -19,6 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+use clap::ArgMatches;
 use log::{debug, warn};
 use std::collections::HashMap;
 use std::fs;
@@ -153,6 +154,12 @@ impl Slurm {
 }
 
 impl Scheduler for Slurm {
+    fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf> {
+        (0..=9).map(|hash| {
+            self.base.join(format!("hash.{}", hash)).to_owned()
+        }).collect()
+    }
+
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, _dirname)) = is_job_path(&event_path) {
             Some(Box::new(SlurmJobEntry::new(

@@ -19,7 +19,130 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+use clap::ArgMatches;
+use log::debug;
+use std::collections::HashMap;
+use std::io::{Error, ErrorKind};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use super::job::JobInfo;
 use super::Scheduler;
 
+
+pub struct TorqueJobEntry {
+    /// The full path to the file that needs to be archived
+    path_: PathBuf,
+    /// The job ID
+    jobid_: String,
+    /// The file type
+    file_type_: String,
+    /// Time of event notification and instance creation
+    moment_: Instant,
+    /// The actual job script
+    script_: Option<String>,
+    /// The Slurm environment
+    env_: Option<HashMap<String, String>>,
+}
+
+impl TorqueJobEntry {
+    fn new(p: &PathBuf, id: &str, t: &str) -> TorqueJobEntry {
+        TorqueJobEntry {
+            path_: p.clone(),
+            jobid_: id.to_owned(),
+            file_type_: t.to_owned(),
+            moment_: Instant::now(),
+            script_: None,
+            env_: None,
+        }
+    }
+}
+
+impl JobInfo for  TorqueJobEntry {
+    fn jobid(&self) -> String {
+        self.jobid_.clone()
+    }
+
+    // Return the moment of event occurence
+    fn moment(&self) -> Instant {
+        self.moment_
+    }
+
+    // Retrieve all the information for the job from the spool location
+    // This fills up the required data structures to be able to write
+    // the backup or ship the information to some consumer
+    fn read_job_info(&mut self) -> Result<(), Error> { Ok(()) }
+
+    // Return a Vec of tuples with the filename and file contents for
+    // each file that needs to be written as a backup
+    fn files(&self) -> Vec<(String, String)> { [].to_vec() }
+
+    // Return the actual job script as a String
+    fn script(&self) -> String {
+        match &self.script_ {
+            Some(s) => s.clone(),
+            None => panic!("No script available for job {}", self.jobid_),
+        }
+    }
+
+    // Return additional information as a set of key-value pairs
+    fn extra_info(&self) -> Option<HashMap<String, String>> {
+        None
+    }
+}
+
+
+pub struct Torque {
+    pub base: PathBuf,
+}
+
+impl Torque {
+    pub fn new(base: &PathBuf) -> Torque {
+        Torque { base: base.clone() }
+    }
+}
+
+impl Scheduler for Torque {
+
+    fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf> {
+        if matches.is_present("subdirs") {
+            (0..=9).map(|sd| {
+                self.base.join(format!("{}", sd)).to_owned()
+            }).collect()
+        } else {
+            [self.base.clone()].to_vec()
+        }
+    }
+
+
+    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
+        if let Some((jobid, _dirname, file_type)) = is_job_path(&event_path) {
+            Some(Box::new(TorqueJobEntry::new(
+                &_dirname.to_path_buf(),
+                jobid,
+                &file_type,
+            )))
+        } else {
+            None
+        }
+    }
+}
+
+// Verifies that the path metioned in the event is a that of a file that
+/// needs archival
+///
+/// This ignores the path prefix, but verifies that
+/// - the path points to a file
+/// - there is a path dir component that starts with "job."
+///
+/// We return a tuple of two strings: the job ID and the filename, wrapped in
+/// an Option.
+fn is_job_path(path: &Path) -> Option<(&str, &Path, String)> {
+    if path.is_file() {
+        let jobid = path.file_stem().unwrap().to_str().unwrap();
+        let file_type = path.extension().unwrap().to_str().unwrap();
+        return Some((jobid, path, file_type.to_string()));
+    }
+    debug!("{:?} is not a considered job path", &path);
+    None
+}
