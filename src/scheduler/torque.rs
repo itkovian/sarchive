@@ -22,43 +22,41 @@ SOFTWARE.
 use clap::ArgMatches;
 use log::debug;
 use std::collections::HashMap;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use super::job::JobInfo;
 use super::Scheduler;
 
+use crate::utils;
 
 pub struct TorqueJobEntry {
     /// The full path to the file that needs to be archived
     path_: PathBuf,
     /// The job ID
     jobid_: String,
-    /// The file type
-    file_type_: String,
     /// Time of event notification and instance creation
     moment_: Instant,
     /// The actual job script
     script_: Option<String>,
-    /// The Slurm environment
-    env_: Option<HashMap<String, String>>,
+    /// Additional info for the job
+    env_: HashMap<String, String>,
 }
 
 impl TorqueJobEntry {
-    fn new(p: &PathBuf, id: &str, t: &str) -> TorqueJobEntry {
+    fn new(p: &PathBuf, id: &str) -> TorqueJobEntry {
         TorqueJobEntry {
             path_: p.clone(),
             jobid_: id.to_owned(),
-            file_type_: t.to_owned(),
             moment_: Instant::now(),
             script_: None,
-            env_: None,
+            env_: HashMap::new(),
         }
     }
 }
 
-impl JobInfo for  TorqueJobEntry {
+impl JobInfo for TorqueJobEntry {
     fn jobid(&self) -> String {
         self.jobid_.clone()
     }
@@ -71,7 +69,26 @@ impl JobInfo for  TorqueJobEntry {
     // Retrieve all the information for the job from the spool location
     // This fills up the required data structures to be able to write
     // the backup or ship the information to some consumer
-    fn read_job_info(&mut self) -> Result<(), Error> { Ok(()) }
+    fn read_job_info(&mut self) -> Result<(), Error> {
+        let dir = self.path_.parent().unwrap();
+        let filename = self.path_.strip_prefix(&dir).unwrap();
+        self.script_ = Some(utils::read_file(&dir, &filename)?);
+
+        self.env_ = HashMap::new();
+        // check for the presence of a .TA file
+        if self.path_.with_extension("TA").exists() {
+            // FIXME: implement this
+        } else {
+            // check for the single .JB file.
+            if self.path_.with_extension("JB").exists() {
+                let jb_filename = filename.with_extension("JB");
+                let jb = utils::read_file(dir, &jb_filename)?;
+
+                self.env_.insert(jb_filename.to_str().unwrap().to_string(), jb.to_owned());
+            }
+        }
+        Ok(())
+    }
 
     // Return a Vec of tuples with the filename and file contents for
     // each file that needs to be written as a backup
@@ -87,10 +104,9 @@ impl JobInfo for  TorqueJobEntry {
 
     // Return additional information as a set of key-value pairs
     fn extra_info(&self) -> Option<HashMap<String, String>> {
-        None
+        Some(self.env_.clone())
     }
 }
-
 
 pub struct Torque {
     pub base: PathBuf,
@@ -116,32 +132,34 @@ impl Scheduler for Torque {
 
 
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
-        if let Some((jobid, _dirname, file_type)) = is_job_path(&event_path) {
-            Some(Box::new(TorqueJobEntry::new(
-                &_dirname.to_path_buf(),
-                jobid,
-                &file_type,
-            )))
+        /*is_job_path(&event_path).map(|(jobid, dirname)| {
+            let t = TorqueJobEntry::new(&dirname.to_path_buf(), jobid);
+            Box::new(t)
+        })*/
+        if let Some((jobid, filename)) = is_job_path(&event_path) {
+            Some(Box::new(TorqueJobEntry::new(&filename.to_path_buf(), jobid)))
         } else {
             None
         }
     }
 }
 
-// Verifies that the path metioned in the event is a that of a file that
+/// Verifies that the path metioned in the event is a that of a file that
 /// needs archival
 ///
 /// This ignores the path prefix, but verifies that
 /// - the path points to a file
-/// - there is a path dir component that starts with "job."
+/// - the extension of the file is .SC (indicating a torque script file)
 ///
 /// We return a tuple of two strings: the job ID and the filename, wrapped in
 /// an Option.
-fn is_job_path(path: &Path) -> Option<(&str, &Path, String)> {
+fn is_job_path(path: &Path) -> Option<(&str, &Path)> {
     if path.is_file() {
         let jobid = path.file_stem().unwrap().to_str().unwrap();
-        let file_type = path.extension().unwrap().to_str().unwrap();
-        return Some((jobid, path, file_type.to_string()));
+        return match path.extension().unwrap().to_str().unwrap() {
+            "SC" => Some((jobid, path)),
+            _ => None
+        }
     }
     debug!("{:?} is not a considered job path", &path);
     None

@@ -36,6 +36,7 @@ use std::sync::Arc;
 mod archive;
 mod monitor;
 mod scheduler;
+mod utils;
 
 #[cfg(feature = "elasticsearch-7")]
 use archive::elastic as el;
@@ -204,15 +205,17 @@ fn main() {
     let (sig_sender, sig_receiver) = bounded(20);
     let cleanup = matches.is_present("cleanup");
 
-    // we will watch the ten hash.X directories
+    // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
     let sched = create(&scheduler_kind, &base.to_path_buf());
     if let Err(e) = scope(|s| {
+
         let ss = &sig_sender;
         s.spawn(move |_| {
             signal_handler_atomic(ss, notification, &parker);
             info!("Signal handled");
         });
+
         for loc in sched.watch_locations(&matches) {
             let t = &sender;
             let sr = &sig_receiver;
@@ -220,11 +223,12 @@ fn main() {
             s.spawn(move |_| match monitor(sl, &loc, t, sr) {
                 Ok(_) => info!("Stopped watching location {:?}", &loc),
                 Err(e) => {
-                        error!("{:?}", e);
-                        panic!("Error watching {:?}", &base);
+                    error!("{:?}", e);
+                    panic!("Error watching {:?}", &base);
                 }
             });
         }
+
         let r = &receiver;
         let sr = &sig_receiver;
         s.spawn(move |_| process(archiver, r, sr, cleanup));
