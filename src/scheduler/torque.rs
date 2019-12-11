@@ -20,6 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 use clap::ArgMatches;
+use glob::glob;
 use log::debug;
 use std::collections::HashMap;
 use std::io::Error;
@@ -77,14 +78,38 @@ impl JobInfo for TorqueJobEntry {
         self.env_ = HashMap::new();
         // check for the presence of a .TA file
         if self.path_.with_extension("TA").exists() {
-            // FIXME: implement this
+            // First, get the array file
+            let ta_filename = filename.with_extension("TA");
+            let ta = utils::read_file(dir, &ta_filename)?;
+            self.env_
+                .insert(ta_filename.to_str().unwrap().to_string(), ta.to_owned());
+            // If the job is an array job, there are multiple JB files.
+            // The file name pattern is: 2720868-946.master.cluster.JB
+            // Split the filename into appropriate parts
+            let fparts = filename.to_str().unwrap().split(".").collect::<Vec<&str>>();
+            glob(&format!("{:?}/{}-*.JB", dir, fparts[0]))
+                .unwrap()
+                .filter_map(|jb_path| {
+                    if let Ok(jb_path) = jb_path {
+                        let jb_dir = jb_path.parent()?;
+                        let jb_filename = jb_path.strip_prefix(&jb_dir).unwrap();
+                        let jb = utils::read_file(&jb_dir, &jb_filename).unwrap();
+                        Some((jb_filename.to_owned(), jb.to_owned()))
+                    } else { None }
+                })
+                .map(|(jb_filename, jb)| {
+                    self.env_
+                        .insert(jb_filename.to_str().unwrap().to_string(), jb.to_owned());
+                });
+
         } else {
             // check for the single .JB file.
             if self.path_.with_extension("JB").exists() {
                 let jb_filename = filename.with_extension("JB");
                 let jb = utils::read_file(dir, &jb_filename)?;
 
-                self.env_.insert(jb_filename.to_str().unwrap().to_string(), jb.to_owned());
+                self.env_
+                    .insert(jb_filename.to_str().unwrap().to_string(), jb.to_owned());
             }
         }
         Ok(())
@@ -92,7 +117,9 @@ impl JobInfo for TorqueJobEntry {
 
     // Return a Vec of tuples with the filename and file contents for
     // each file that needs to be written as a backup
-    fn files(&self) -> Vec<(String, String)> { [].to_vec() }
+    fn files(&self) -> Vec<(String, String)> {
+        [].to_vec()
+    }
 
     // Return the actual job script as a String
     fn script(&self) -> String {
@@ -119,17 +146,15 @@ impl Torque {
 }
 
 impl Scheduler for Torque {
-
     fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf> {
         if matches.is_present("subdirs") {
-            (0..=9).map(|sd| {
-                self.base.join(format!("{}", sd)).to_owned()
-            }).collect()
+            (0..=9)
+                .map(|sd| self.base.join(format!("{}", sd)).to_owned())
+                .collect()
         } else {
             [self.base.clone()].to_vec()
         }
     }
-
 
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         /*is_job_path(&event_path).map(|(jobid, dirname)| {
@@ -137,7 +162,10 @@ impl Scheduler for Torque {
             Box::new(t)
         })*/
         if let Some((jobid, filename)) = is_job_path(&event_path) {
-            Some(Box::new(TorqueJobEntry::new(&filename.to_path_buf(), jobid)))
+            Some(Box::new(TorqueJobEntry::new(
+                &filename.to_path_buf(),
+                jobid,
+            )))
         } else {
             None
         }
@@ -158,8 +186,8 @@ fn is_job_path(path: &Path) -> Option<(&str, &Path)> {
         let jobid = path.file_stem().unwrap().to_str().unwrap();
         return match path.extension().unwrap().to_str().unwrap() {
             "SC" => Some((jobid, path)),
-            _ => None
-        }
+            _ => None,
+        };
     }
     debug!("{:?} is not a considered job path", &path);
     None

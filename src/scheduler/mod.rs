@@ -44,7 +44,7 @@ pub fn create(kind: &SchedulerKind, spool_path: &PathBuf) -> Box<dyn Scheduler> 
     match kind {
         SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path)),
         SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path)),
-}
+    }
 }
 
 #[cfg(test)]

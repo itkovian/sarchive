@@ -56,7 +56,6 @@ impl SlurmJobEntry {
     }
 }
 
-
 impl JobInfo for SlurmJobEntry {
     fn jobid(&self) -> String {
         self.jobid_.clone()
@@ -73,11 +72,15 @@ impl JobInfo for SlurmJobEntry {
     }
 
     fn files(&self) -> Vec<(String, String)> {
-        [ ("script", self.script_.as_ref()), ("environment", self.env_.as_ref())].iter()
-            .filter_map(|(filename, v)|
-                v.map(|s| (format!("job.{}_{}", self.jobid_, filename), s.to_string()))
-            )
-            .collect()
+        [
+            ("script", self.script_.as_ref()),
+            ("environment", self.env_.as_ref()),
+        ]
+        .iter()
+        .filter_map(|(filename, v)| {
+            v.map(|s| (format!("job.{}_{}", self.jobid_, filename), s.to_string()))
+        })
+        .collect()
     }
 
     fn script(&self) -> String {
@@ -95,7 +98,7 @@ impl JobInfo for SlurmJobEntry {
                         let ps: Vec<_> = s.split('=').collect();
                         match ps.len() {
                             2 => Some((ps[0].to_owned(), ps[1].to_owned())),
-                            _ => Some((s.to_owned(), String::from("")))
+                            _ => Some((s.to_owned(), String::from(""))),
                         }
                     } else {
                         None
@@ -118,9 +121,9 @@ impl Slurm {
 
 impl Scheduler for Slurm {
     fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf> {
-        (0..=9).map(|hash| {
-            self.base.join(format!("hash.{}", hash)).to_owned()
-        }).collect()
+        (0..=9)
+            .map(|hash| self.base.join(format!("hash.{}", hash)).to_owned())
+            .collect()
     }
 
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {

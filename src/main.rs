@@ -209,7 +209,6 @@ fn main() {
     let (sender, receiver) = unbounded();
     let sched = create(&scheduler_kind, &base.to_path_buf());
     if let Err(e) = scope(|s| {
-
         let ss = &sig_sender;
         s.spawn(move |_| {
             signal_handler_atomic(ss, notification, &parker);
