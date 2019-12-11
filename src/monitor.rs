@@ -43,13 +43,7 @@ fn check_and_queue(
     event: Event,
 ) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
-    // FIXME: This is still slurm-specific.
-    if let Event {
-        kind: EventKind::Create(CreateKind::Folder),
-        paths,
-        ..
-    } = event
-    {
+    if let Some(paths) = scheduler.verify_event_kind(&event) {
         if let Some(jobinfo) = scheduler.create_job_info(&paths[0]) {
             debug!("Sending jobinfo");
             s.send(jobinfo).unwrap();

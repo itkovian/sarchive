@@ -22,6 +22,7 @@ SOFTWARE.
 use clap::ArgMatches;
 use glob::glob;
 use log::debug;
+use notify::event::{CreateKind, Event, EventKind};
 use std::collections::HashMap;
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -184,6 +185,19 @@ impl Scheduler for Torque {
         } else {
             None
         }
+    }
+
+    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>> {
+        if let Event {
+            kind: EventKind::Create(CreateKind::File),
+            paths,
+            ..
+        } = event {
+            Some(paths.to_vec())
+        } else {
+            None
+        }
+
     }
 }
 

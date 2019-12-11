@@ -25,6 +25,7 @@ pub mod slurm;
 pub mod torque;
 
 use clap::ArgMatches;
+use notify::event::Event;
 use std::path::{Path, PathBuf};
 
 use job::JobInfo;
@@ -38,6 +39,7 @@ pub enum SchedulerKind {
 pub trait Scheduler: Send + Sync {
     fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf>;
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
+    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>>;
 }
 
 pub fn create(kind: &SchedulerKind, spool_path: &PathBuf) -> Box<dyn Scheduler> {

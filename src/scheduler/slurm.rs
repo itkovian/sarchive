@@ -21,6 +21,7 @@ SOFTWARE.
 */
 use clap::ArgMatches;
 use log::debug;
+use notify::event::{CreateKind, Event, EventKind};
 use std::collections::HashMap;
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -124,7 +125,7 @@ impl Scheduler for Slurm {
         (0..=9)
             .map(|hash| self.base.join(format!("hash.{}", hash)).to_owned())
             .collect()
-    }
+}
 
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, _dirname)) = is_job_path(&event_path) {
@@ -132,6 +133,18 @@ impl Scheduler for Slurm {
                 &event_path.to_path_buf(),
                 jobid,
             )))
+        } else {
+            None
+        }
+    }
+
+    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>> {
+        if let Event {
+            kind: EventKind::Create(CreateKind::Folder),
+            paths,
+            ..
+        } = event {
+            Some(paths.to_vec())
         } else {
             None
         }
