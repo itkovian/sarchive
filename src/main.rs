@@ -22,15 +22,13 @@ SOFTWARE.
 
 use chrono;
 use clap::{App, Arg, ArgMatches};
-use crossbeam_channel::{bounded, unbounded, Sender};
-use crossbeam_utils::sync::{Parker, Unparker};
+use crossbeam_channel::{bounded, unbounded};
+use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
-use crossbeam_utils::Backoff;
 use log::{error, info};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 
 mod archive;
@@ -46,6 +44,7 @@ use archive::kafka as kf;
 use archive::{archive_builder, process, Archive};
 use monitor::monitor;
 use scheduler::{create, SchedulerKind};
+use utils::{signal_handler_atomic, register_signal_handler};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -132,7 +131,7 @@ fn args<'a>() -> ArgMatches<'a> {
     matches.get_matches()
 }
 
-fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
+/* fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
     info!("Registering signal handler for signal {}", signal);
     let u1 = unparker.clone();
     let n1 = Arc::clone(&notification);
@@ -161,7 +160,7 @@ pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Pa
         sender.send(true).unwrap();
     }
     info!("Sent 20 notifications");
-}
+}*/
 
 fn main() {
     let matches = args();

@@ -19,12 +19,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use log::{debug, warn};
+use crossbeam_channel::Sender;
+use crossbeam_utils::sync::{Parker, Unparker};
+use crossbeam_utils::Backoff;
+use log::{debug, error, info, warn};
 use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+use std::process::exit;
 use std::thread::sleep;
 use std::time::Duration;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
+use std::sync::Arc;
+
 
 /// Read file contents of the file given by the path. Separating the
 /// directory from the filename (which may contain directory hierarchy)
@@ -60,3 +68,37 @@ pub fn read_file(path: &Path, filename: &Path) -> Result<String, Error> {
         }
     }
 }
+
+/// Register the handler for the given signal, so we can properly cleanup all threads
+pub fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
+    info!("Registering signal handler for signal {}", signal);
+    let u1 = unparker.clone();
+    let n1 = Arc::clone(&notification);
+    unsafe {
+        if let Err(e) = signal_hook::register(signal, move || {
+            info!("Received signal {}", signal);
+            n1.store(true, SeqCst);
+            u1.unpark()
+        }) {
+            error!("Cannot register signal {}: {:?}", signal, e);
+            exit(1);
+        }
+    };
+}
+
+/// Handle the signal
+pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
+    let backoff = Backoff::new();
+    while !sig.load(SeqCst) {
+        if backoff.is_completed() {
+            p.park();
+        } else {
+            backoff.snooze();
+        }
+    }
+    for _ in 0..20 {
+        sender.send(true).unwrap();
+    }
+    info!("Sent 20 notifications");
+}
+
