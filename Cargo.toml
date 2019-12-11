@@ -10,6 +10,7 @@ homepage = "https://github.com/itkovian/sarchive"
 repository = "https://github.com/itkovian/sarchive"
 keywords = ["slurm", "cli", "archival", "hpc"]
 categories = ["command-line-utilities"]
+maintenance = { status = "actively-developed" }
 
 [badges]
 travis-ci = { repository = "itkovian/sarchive" }
@@ -57,4 +58,3 @@ sarchive = { path = "/usr/bin/sarchive" }
 [package.metadata.rpm.files]
 service = { path = "/usr/lib/systemd/system/sarchive.service" }
 
-maintenance = { status = "actively-developed" }
