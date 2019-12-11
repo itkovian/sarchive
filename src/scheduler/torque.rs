@@ -35,6 +35,8 @@ use crate::utils;
 pub struct TorqueJobEntry {
     /// The full path to the file that needs to be archived
     path_: PathBuf,
+    /// The filename of the job
+    jobname_: Option<String>,
     /// The job ID
     jobid_: String,
     /// Time of event notification and instance creation
@@ -49,6 +51,7 @@ impl TorqueJobEntry {
     fn new(p: &PathBuf, id: &str) -> TorqueJobEntry {
         TorqueJobEntry {
             path_: p.clone(),
+            jobname_: None,
             jobid_: id.to_owned(),
             moment_: Instant::now(),
             script_: None,
@@ -73,6 +76,7 @@ impl JobInfo for TorqueJobEntry {
     fn read_job_info(&mut self) -> Result<(), Error> {
         let dir = self.path_.parent().unwrap();
         let filename = self.path_.strip_prefix(&dir).unwrap();
+        self.jobname_ = Some(filename.to_str().unwrap().to_string());
         self.script_ = Some(utils::read_file(&dir, &filename)?);
 
         // check for the presence of a .TA file
@@ -120,7 +124,16 @@ impl JobInfo for TorqueJobEntry {
     // Return a Vec of tuples with the filename and file contents for
     // each file that needs to be written as a backup
     fn files(&self) -> Vec<(String, String)> {
-        [].to_vec()
+        let mut fs : Vec<(String, String)> = Vec::new();
+        if let Some(jn) = &self.jobname_ {
+            if let Some(script) = &self.script_ {
+                fs.push((jn.to_string(), script.to_string()));
+            }
+        }
+        for (jb, jb_contents) in self.env_.iter() {
+            fs.push((jb.to_string(), jb_contents.to_string()));
+        }
+        fs
     }
 
     // Return the actual job script as a String
