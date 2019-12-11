@@ -75,7 +75,6 @@ impl JobInfo for TorqueJobEntry {
         let filename = self.path_.strip_prefix(&dir).unwrap();
         self.script_ = Some(utils::read_file(&dir, &filename)?);
 
-        self.env_ = HashMap::new();
         // check for the presence of a .TA file
         if self.path_.with_extension("TA").exists() {
             // First, get the array file
@@ -95,13 +94,16 @@ impl JobInfo for TorqueJobEntry {
                         let jb_filename = jb_path.strip_prefix(&jb_dir).unwrap();
                         let jb = utils::read_file(&jb_dir, &jb_filename).unwrap();
                         Some((jb_filename.to_owned(), jb.to_owned()))
-                    } else { None }
+                    } else {
+                        None
+                    }
                 })
                 .map(|(jb_filename, jb)| {
                     self.env_
                         .insert(jb_filename.to_str().unwrap().to_string(), jb.to_owned());
-                });
-
+                    Some(())
+                })
+                .for_each(drop);
         } else {
             // check for the single .JB file.
             if self.path_.with_extension("JB").exists() {
