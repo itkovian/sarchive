@@ -42,13 +42,6 @@ pub fn clap_subcommand(command: &str) -> App {
                 .help("Location of the job scripts' archive."),
         )
         .arg(
-            Arg::with_name("logfile")
-                .long("logfile")
-                .short("l")
-                .takes_value(true)
-                .help("Log file name.")
-        )
-        .arg(
             Arg::with_name("period")
                 .long("period")
                 .short("p")

@@ -44,7 +44,7 @@ use archive::kafka as kf;
 use archive::{archive_builder, process, Archive};
 use monitor::monitor;
 use scheduler::{create, SchedulerKind};
-use utils::{signal_handler_atomic, register_signal_handler};
+use utils::{register_signal_handler, signal_handler_atomic};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -97,6 +97,13 @@ fn args<'a>() -> ArgMatches<'a> {
                 .help(
                     "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
                 )
+        )
+        .arg(
+            Arg::with_name("logfile")
+                .long("logfile")
+                .short("l")
+                .takes_value(true)
+                .help("Log file name.")
         )
         .arg(
             Arg::with_name("scheduler")
