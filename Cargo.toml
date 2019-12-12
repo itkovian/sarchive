@@ -10,11 +10,11 @@ homepage = "https://github.com/itkovian/sarchive"
 repository = "https://github.com/itkovian/sarchive"
 keywords = ["slurm", "cli", "archival", "hpc"]
 categories = ["command-line-utilities"]
-maintenance = { status = "actively-developed" }
 
 [badges]
 travis-ci = { repository = "itkovian/sarchive" }
 coveralls = { repository = "itkovian/sarchive" }
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 chrono = { version = "0.4.10", features = ["serde"] }
