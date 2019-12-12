@@ -50,7 +50,7 @@ kafka = ["rdkafka", "serde", "serde_derive", "serde_json"]
 tempfile = "3.0.7"
 
 [package.metadata.rpm.cargo]
-buildflags = ["--release"]
+buildflags = ["--release", "--all-features"]
 
 [package.metadata.rpm.targets]
 sarchive = { path = "/usr/bin/sarchive" }
