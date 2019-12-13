@@ -27,12 +27,11 @@ use std::fs;
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::process::exit;
-use std::thread::sleep;
-use std::time::Duration;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
-
+use std::thread::sleep;
+use std::time::Duration;
 
 /// Read file contents of the file given by the path. Separating the
 /// directory from the filename (which may contain directory hierarchy)
@@ -101,4 +100,3 @@ pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Pa
     }
     info!("Sent 20 notifications");
 }
-

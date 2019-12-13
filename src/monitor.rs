@@ -25,7 +25,7 @@ extern crate crossbeam_utils;
 
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use log::*;
-use notify::event::{CreateKind, Event, EventKind};
+use notify::event::Event;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::io::Error;
 use std::path::Path;

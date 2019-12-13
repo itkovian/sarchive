@@ -49,9 +49,15 @@ use utils::{register_signal_handler, signal_handler_atomic};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn setup_logging(
-    level_filter: log::LevelFilter,
+    debug: bool,
     logfile: Option<&str>,
 ) -> Result<(), log::SetLoggerError> {
+    let level_filter = if debug {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
+
     let base_config = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -113,12 +119,9 @@ fn args<'a>() -> ArgMatches<'a> {
                 .possible_values(&["slurm", "torque"])
                 .help("Supported schedulers")
         )
-        .arg(
-            Arg::with_name("subdirs")
-                .long("subdirs")
-                .help(
-                    "Watch the subdirectories 0..9 of the job spool dir."
-                )
+        .arg(Arg::with_name("torque-subdirs ")
+            .long("torque-subdirs")
+            .help("Monitor the subdirs 0...9 in the torque spool directory")
         )
         .arg(
             Arg::with_name("spool")
@@ -133,51 +136,18 @@ fn args<'a>() -> ArgMatches<'a> {
 
     #[cfg(feature = "elasticsearch-7")]
     let matches = matches.subcommand(el::clap_subcommand("elasticsearch"));
+
     #[cfg(feature = "kafka")]
     let matches = matches.subcommand(kf::clap_subcommand("kafka"));
+
     matches.get_matches()
 }
 
-/* fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
-    info!("Registering signal handler for signal {}", signal);
-    let u1 = unparker.clone();
-    let n1 = Arc::clone(&notification);
-    unsafe {
-        if let Err(e) = signal_hook::register(signal, move || {
-            info!("Received signal {}", signal);
-            n1.store(true, SeqCst);
-            u1.unpark()
-        }) {
-            error!("Cannot register signal {}: {:?}", signal, e);
-            exit(1);
-        }
-    };
-}
 
-pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
-    let backoff = Backoff::new();
-    while !sig.load(SeqCst) {
-        if backoff.is_completed() {
-            p.park();
-        } else {
-            backoff.snooze();
-        }
-    }
-    for _ in 0..20 {
-        sender.send(true).unwrap();
-    }
-    info!("Sent 20 notifications");
-}*/
-
-fn main() {
+fn main() -> Result<(), std::io::Error> {
     let matches = args();
 
-    let log_level = if matches.is_present("debug") {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Info
-    };
-    match setup_logging(log_level, matches.value_of("logfile")) {
+    match setup_logging(matches.is_present("debug"), matches.value_of("logfile")) {
         Ok(_) => (),
         Err(e) => panic!("Cannot set up logging: {:?}", e),
     };

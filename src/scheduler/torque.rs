@@ -33,6 +33,7 @@ use super::Scheduler;
 
 use crate::utils;
 
+
 pub struct TorqueJobEntry {
     /// The full path to the file that needs to be archived
     path_: PathBuf,
@@ -125,7 +126,7 @@ impl JobInfo for TorqueJobEntry {
     // Return a Vec of tuples with the filename and file contents for
     // each file that needs to be written as a backup
     fn files(&self) -> Vec<(String, String)> {
-        let mut fs : Vec<(String, String)> = Vec::new();
+        let mut fs: Vec<(String, String)> = Vec::new();
         if let Some(jn) = &self.jobname_ {
             if let Some(script) = &self.script_ {
                 fs.push((jn.to_string(), script.to_string()));
@@ -192,12 +193,12 @@ impl Scheduler for Torque {
             kind: EventKind::Create(CreateKind::File),
             paths,
             ..
-        } = event {
+        } = event
+        {
             Some(paths.to_vec())
         } else {
             None
         }
-
     }
 }
 
