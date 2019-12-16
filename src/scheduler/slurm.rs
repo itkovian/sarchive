@@ -33,7 +33,7 @@ use crate::utils;
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
-    /// The full path to the file that needs to be archived
+    /// The full path to the job information directory
     pub path_: PathBuf,
     /// The job ID
     jobid_: String,
@@ -41,14 +41,34 @@ pub struct SlurmJobEntry {
     moment_: Instant,
     /// The actual job script
     script_: Option<String>,
-    /// The Slurm environment
+    /// The job's environment in Slurm
     env_: Option<String>,
 }
 
 impl SlurmJobEntry {
-    pub fn new(p: &PathBuf, id: &str) -> SlurmJobEntry {
+
+    /// Returns a new SlurmJobEntry with the given path to the job info and the given job ID
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A `PathBuf` pointing to the directory (usually .../job.<jobid>)
+    /// * `id` - A string slice representing the job ID
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::{PathBuf};
+    ///
+    /// let p = PathBuf::new("/var/spool/slurm/hash.2/job.1234");
+    /// let id = "1234";
+    ///
+    /// let job_entry = SlurmJobEntry::new(&p, &id);
+    ///
+    /// assert_eq!(job_entry.path_, p);
+    /// ```
+    pub fn new(path: &PathBuf, id: &str) -> SlurmJobEntry {
         SlurmJobEntry {
-            path_: p.clone(),
+            path_: path.clone(),
             jobid_: id.to_string(),
             moment_: Instant::now(),
             script_: None,

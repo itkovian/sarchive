@@ -115,7 +115,7 @@ mod tests {
     use super::*;
     use crate::scheduler::job::JobInfo;
     use crate::scheduler::slurm::SlurmJobEntry;
-    use crossbeam_channel::{select, unbounded, Receiver};
+    use crossbeam_channel::unbounded;
     use crossbeam_utils::thread::scope;
     use std::env::current_dir;
     use std::path::PathBuf;
@@ -139,7 +139,6 @@ mod tests {
 
         scope(|s| {
             let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-            let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456");
             let slurm_job_entry = SlurmJobEntry::new(&path, "123456");
             s.spawn(move |_| match process(archiver, &rx1, &rx2, false) {
                 Ok(v) => assert_eq!(v, ()),
