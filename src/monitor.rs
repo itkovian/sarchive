@@ -25,7 +25,7 @@ extern crate crossbeam_utils;
 
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use log::*;
-use notify::event::{CreateKind, Event, EventKind};
+use notify::event::Event;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use std::io::Error;
 use std::path::Path;
@@ -43,13 +43,7 @@ fn check_and_queue(
     event: Event,
 ) -> Result<(), Error> {
     debug!("Event received: {:?}", event);
-    // FIXME: This is still slurm-specific.
-    if let Event {
-        kind: EventKind::Create(CreateKind::Folder),
-        paths,
-        ..
-    } = event
-    {
+    if let Some(paths) = scheduler.verify_event_kind(&event) {
         if let Some(jobinfo) = scheduler.create_job_info(&paths[0]) {
             debug!("Sending jobinfo");
             s.send(jobinfo).unwrap();
@@ -64,9 +58,8 @@ fn check_and_queue(
 /// upon receipt of which it immediately returns.
 #[allow(clippy::borrowed_box)]
 pub fn monitor(
-    scheduler: Box<dyn Scheduler>,
-    base: &Path,
-    hash: u8,
+    scheduler: &Box<dyn Scheduler>,
+    path: &Path,
     s: &Sender<Box<dyn JobInfo>>,
     sigchannel: &Receiver<bool>,
 ) -> notify::Result<()> {
@@ -74,7 +67,6 @@ pub fn monitor(
 
     // create a platform-specific watcher
     let mut watcher = RecommendedWatcher::new_immediate(move |res| tx.send(res).unwrap())?;
-    let path = base.join(format!("hash.{}", hash));
 
     info!("Watching path {:?}", &path);
 

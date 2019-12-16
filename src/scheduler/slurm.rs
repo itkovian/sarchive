@@ -19,20 +19,21 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use log::{debug, warn};
+use clap::ArgMatches;
+use log::debug;
+use notify::event::{CreateKind, Event, EventKind};
 use std::collections::HashMap;
-use std::fs;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::{Path, PathBuf};
-use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use super::job::JobInfo;
 use super::Scheduler;
+use crate::utils;
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
-    /// The full path to the file that needs to be archived
+    /// The full path to the job information directory
     pub path_: PathBuf,
     /// The job ID
     jobid_: String,
@@ -40,49 +41,37 @@ pub struct SlurmJobEntry {
     moment_: Instant,
     /// The actual job script
     script_: Option<String>,
-    /// The Slurm environment
-    env_: Option<HashMap<String, String>>,
+    /// The job's environment in Slurm
+    env_: Option<String>,
 }
 
 impl SlurmJobEntry {
-    pub fn new(p: &PathBuf, id: &str) -> SlurmJobEntry {
+    /// Returns a new SlurmJobEntry with the given path to the job info and the given job ID
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A `PathBuf` pointing to the directory (usually .../job.<jobid>)
+    /// * `id` - A string slice representing the job ID
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::{PathBuf};
+    ///
+    /// let p = PathBuf::new("/var/spool/slurm/hash.2/job.1234");
+    /// let id = "1234";
+    ///
+    /// let job_entry = SlurmJobEntry::new(&p, &id);
+    ///
+    /// assert_eq!(job_entry.path_, p);
+    /// ```
+    pub fn new(path: &PathBuf, id: &str) -> SlurmJobEntry {
         SlurmJobEntry {
-            path_: p.clone(),
+            path_: path.clone(),
             jobid_: id.to_string(),
             moment_: Instant::now(),
             script_: None,
             env_: None,
-        }
-    }
-}
-
-fn read_file(path: &Path, filename: &str) -> Result<String, Error> {
-    let fpath = path.join(filename);
-    let mut iters = 100;
-    let ten_millis = Duration::from_millis(10);
-    while !Path::exists(&fpath) && iters > 0 {
-        debug!("Waiting for {:?}", &fpath);
-        sleep(ten_millis);
-        if !Path::exists(&path) {
-            debug!("Job directory {:?} no longer exists", &path);
-            return Err(Error::new(
-                ErrorKind::NotFound,
-                format!("Job directory {:?} no longer exists", &path),
-            ));
-        }
-        iters -= 1;
-    }
-    match iters {
-        0 => {
-            warn!("Timeout waiting for {:?} to appear", &fpath);
-            Err(Error::new(
-                ErrorKind::NotFound,
-                format!("File {:?} did not appear after waiting 1s", &fpath),
-            ))
-        }
-        _ => {
-            let data = fs::read_to_string(&fpath)?;
-            Ok(data)
         }
     }
 }
@@ -97,37 +86,21 @@ impl JobInfo for SlurmJobEntry {
     }
 
     fn read_job_info(&mut self) -> Result<(), Error> {
-        self.script_ = Some(read_file(&self.path_, "script")?);
-
-        let s = read_file(&self.path_, "environment")?;
-        self.env_ = Some(
-            s.split('\0')
-                .filter(|s| !s.is_empty())
-                .map(|s| {
-                    let ps: Vec<_> = s.split('=').collect();
-                    if ps.len() == 2 {
-                        (ps[0].to_owned(), ps[1].to_owned())
-                    } else {
-                        (s.to_owned(), String::from(""))
-                    }
-                })
-                .collect(),
-        );
+        self.script_ = Some(utils::read_file(&self.path_, &Path::new("script"))?);
+        self.env_ = Some(utils::read_file(&self.path_, &Path::new("environment"))?);
         Ok(())
     }
 
     fn files(&self) -> Vec<(String, String)> {
-        if let Some(s) = &self.script_ {
-            vec![
-                (format!("job.{}_script", self.jobid_), s.to_string()),
-                (
-                    format!("job.{}_environment", self.jobid_),
-                    format!("{:?}", self.env_),
-                ),
-            ]
-        } else {
-            Vec::new()
-        }
+        [
+            ("script", self.script_.as_ref()),
+            ("environment", self.env_.as_ref()),
+        ]
+        .iter()
+        .filter_map(|(filename, v)| {
+            v.map(|s| (format!("job.{}_{}", self.jobid_, filename), s.to_string()))
+        })
+        .collect()
     }
 
     fn script(&self) -> String {
@@ -138,7 +111,21 @@ impl JobInfo for SlurmJobEntry {
     }
 
     fn extra_info(&self) -> Option<HashMap<String, String>> {
-        self.env_.clone()
+        self.env_.as_ref().map(|s| {
+            s.split('\0')
+                .filter_map(|s| {
+                    if !s.is_empty() {
+                        let ps: Vec<_> = s.split('=').collect();
+                        match ps.len() {
+                            2 => Some((ps[0].to_owned(), ps[1].to_owned())),
+                            _ => Some((s.to_owned(), String::from(""))),
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
     }
 }
 
@@ -153,12 +140,31 @@ impl Slurm {
 }
 
 impl Scheduler for Slurm {
+    fn watch_locations(&self, _matches: &ArgMatches) -> Vec<PathBuf> {
+        (0..=9)
+            .map(|hash| self.base.join(format!("hash.{}", hash)).to_owned())
+            .collect()
+    }
+
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, _dirname)) = is_job_path(&event_path) {
             Some(Box::new(SlurmJobEntry::new(
                 &event_path.to_path_buf(),
                 jobid,
             )))
+        } else {
+            None
+        }
+    }
+
+    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>> {
+        if let Event {
+            kind: EventKind::Create(CreateKind::Folder),
+            paths,
+            ..
+        } = event
+        {
+            Some(paths.to_vec())
         } else {
             None
         }

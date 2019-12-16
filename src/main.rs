@@ -22,20 +22,19 @@ SOFTWARE.
 
 use chrono;
 use clap::{App, Arg, ArgMatches};
-use crossbeam_channel::{bounded, unbounded, Sender};
-use crossbeam_utils::sync::{Parker, Unparker};
+use crossbeam_channel::{bounded, unbounded};
+use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
-use crossbeam_utils::Backoff;
 use log::{error, info};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering::SeqCst;
 use std::sync::Arc;
 
 mod archive;
 mod monitor;
 mod scheduler;
+mod utils;
 
 #[cfg(feature = "elasticsearch-7")]
 use archive::elastic as el;
@@ -45,13 +44,17 @@ use archive::kafka as kf;
 use archive::{archive_builder, process, Archive};
 use monitor::monitor;
 use scheduler::{create, SchedulerKind};
+use utils::{register_signal_handler, signal_handler_atomic};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn setup_logging(
-    level_filter: log::LevelFilter,
-    logfile: Option<&str>,
-) -> Result<(), log::SetLoggerError> {
+fn setup_logging(debug: bool, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
+    let level_filter = if debug {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
+
     let base_config = fern::Dispatch::new()
         .format(|out, message, record| {
             out.finish(format_args!(
@@ -99,12 +102,23 @@ fn args<'a>() -> ArgMatches<'a> {
                 )
         )
         .arg(
+            Arg::with_name("logfile")
+                .long("logfile")
+                .short("l")
+                .takes_value(true)
+                .help("Log file name.")
+        )
+        .arg(
             Arg::with_name("scheduler")
                 .long("scheduler")
                 .takes_value(true)
                 .default_value("slurm")
-                .possible_values(&["slurm"])
+                .possible_values(&["slurm", "torque"])
                 .help("Supported schedulers")
+        )
+        .arg(Arg::with_name("torque-subdirs ")
+            .long("torque-subdirs")
+            .help("Monitor the subdirs 0...9 in the torque spool directory")
         )
         .arg(
             Arg::with_name("spool")
@@ -112,58 +126,24 @@ fn args<'a>() -> ArgMatches<'a> {
                 .short("s")
                 .takes_value(true)
                 .help(
-                    "Location of the Slurm StateSaveLocation (where the job hash dirs are kept).",
+                    "Location of the Torque job spool (where the job scripts and XML files are kept).",
                 )
         )
         .subcommand(file::clap_subcommand("file"));
 
     #[cfg(feature = "elasticsearch-7")]
     let matches = matches.subcommand(el::clap_subcommand("elasticsearch"));
+
     #[cfg(feature = "kafka")]
     let matches = matches.subcommand(kf::clap_subcommand("kafka"));
+
     matches.get_matches()
 }
 
-fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
-    info!("Registering signal handler for signal {}", signal);
-    let u1 = unparker.clone();
-    let n1 = Arc::clone(&notification);
-    unsafe {
-        if let Err(e) = signal_hook::register(signal, move || {
-            info!("Received signal {}", signal);
-            n1.store(true, SeqCst);
-            u1.unpark()
-        }) {
-            error!("Cannot register signal {}: {:?}", signal, e);
-            exit(1);
-        }
-    };
-}
-
-pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
-    let backoff = Backoff::new();
-    while !sig.load(SeqCst) {
-        if backoff.is_completed() {
-            p.park();
-        } else {
-            backoff.snooze();
-        }
-    }
-    for _ in 0..20 {
-        sender.send(true).unwrap();
-    }
-    info!("Sent 20 notifications");
-}
-
-fn main() {
+fn main() -> Result<(), std::io::Error> {
     let matches = args();
 
-    let log_level = if matches.is_present("debug") {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Info
-    };
-    match setup_logging(log_level, matches.value_of("logfile")) {
+    match setup_logging(matches.is_present("debug"), matches.value_of("logfile")) {
         Ok(_) => (),
         Err(e) => panic!("Cannot set up logging: {:?}", e),
     };
@@ -180,6 +160,7 @@ fn main() {
 
     let scheduler_kind = match matches.value_of("scheduler") {
         Some("slurm") => SchedulerKind::Slurm,
+        Some("torque") => SchedulerKind::Torque,
         _ => panic!("Unsupported scheduler"), // This should have been handled by clap, so never arrive here
     };
     let archiver: Box<dyn Archive> = archive_builder(&matches).unwrap();
@@ -196,27 +177,29 @@ fn main() {
     let (sig_sender, sig_receiver) = bounded(20);
     let cleanup = matches.is_present("cleanup");
 
-    // we will watch the ten hash.X directories
+    // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
+    let sched = create(&scheduler_kind, &base.to_path_buf());
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {
             signal_handler_atomic(ss, notification, &parker);
             info!("Signal handled");
         });
-        for hash in 0..10 {
+
+        for loc in sched.watch_locations(&matches) {
             let t = &sender;
-            let h = hash;
             let sr = &sig_receiver;
-            let sl = create(&scheduler_kind, &base.to_path_buf());
-            s.spawn(move |_| match monitor(sl, base, hash, t, sr) {
-                Ok(_) => info!("Stopped watching hash.{}", &h),
+            let sl = &sched;
+            s.spawn(move |_| match monitor(sl, &loc, t, sr) {
+                Ok(_) => info!("Stopped watching location {:?}", &loc),
                 Err(e) => {
-                    error!("{}", e);
-                    panic!("Error watching hash.{}", &h);
+                    error!("{:?}", e);
+                    panic!("Error watching {:?}", &base);
                 }
             });
         }
+
         let r = &receiver;
         let sr = &sig_receiver;
         s.spawn(move |_| process(archiver, r, sr, cleanup));

@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.9.3"
+version = "0.10.0"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2018"
 description = "Archival tool for slurm job scripts"
@@ -14,6 +14,7 @@ categories = ["command-line-utilities"]
 [badges]
 travis-ci = { repository = "itkovian/sarchive" }
 coveralls = { repository = "itkovian/sarchive" }
+maintenance = { status = "actively-developed" }
 
 [dependencies]
 chrono = { version = "0.4.10", features = ["serde"] }
@@ -24,6 +25,7 @@ crossbeam-queue = "0.2.0"
 crossbeam-utils = "0.7.0"
 fern = { version = "0.5.9", features = ["reopen-03"]}
 futures = "^0.1"
+glob = "0.3.0"
 #futures = "^0.3"
 #notify = "5.0.0-pre.1"
 notify = { git = "https://github.com/passcod/notify", rev = "e04ec0236b2" }  # following latest main branch
@@ -48,7 +50,7 @@ kafka = ["rdkafka", "serde", "serde_derive", "serde_json"]
 tempfile = "3.0.7"
 
 [package.metadata.rpm.cargo]
-buildflags = ["--release"]
+buildflags = ["--release", "--all-features"]
 
 [package.metadata.rpm.targets]
 sarchive = { path = "/usr/bin/sarchive" }
@@ -56,4 +58,3 @@ sarchive = { path = "/usr/bin/sarchive" }
 [package.metadata.rpm.files]
 service = { path = "/usr/lib/systemd/system/sarchive.service" }
 
-maintenance = { status = "actively-developed" }

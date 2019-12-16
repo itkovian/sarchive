@@ -42,13 +42,6 @@ pub fn clap_subcommand(command: &str) -> App {
                 .help("Location of the job scripts' archive."),
         )
         .arg(
-            Arg::with_name("logfile")
-                .long("logfile")
-                .short("l")
-                .takes_value(true)
-                .help("Log file name.")
-        )
-        .arg(
             Arg::with_name("period")
                 .long("period")
                 .short("p")
@@ -251,9 +244,7 @@ mod tests {
 
         let archive_env_contents =
             read_to_string(&archive_dir.join("job.1234_environment")).unwrap();
-        // FIXME: This cannot succeed in its current form as we do not copy
-        //        the files; we read and write their contents in some form
-        //assert_eq!(&archive_env_contents, "environment");
+        assert_eq!(&archive_env_contents, "environment");
 
         let archive_script_contents = read_to_string(&archive_dir.join("job.1234_script")).unwrap();
         assert_eq!(&archive_script_contents, "job script");
