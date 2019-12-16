@@ -36,8 +36,9 @@ use crate::utils;
 
 pub struct TorqueJobEntry {
     /// The full path to the file that needs to be archived
+    /// This should be the `.SC` (script) file
     path_: PathBuf,
-    /// The filename of the job
+    /// The filename of the job script
     jobname_: Option<String>,
     /// The job ID
     jobid_: String,
@@ -91,7 +92,7 @@ impl JobInfo for TorqueJobEntry {
             // If the job is an array job, there are multiple JB files.
             // The file name pattern is: 2720868-946.master.cluster.JB
             // Split the filename into appropriate parts
-            let fparts = filename.to_str().unwrap().split(".").collect::<Vec<&str>>();
+            let fparts = filename.to_str().unwrap().split('.').collect::<Vec<&str>>();
             glob(&format!("{:?}/{}-*.JB", dir, fparts[0]))
                 .unwrap()
                 .filter_map(|jb_path| {
