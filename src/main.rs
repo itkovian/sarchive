@@ -48,10 +48,7 @@ use utils::{register_signal_handler, signal_handler_atomic};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn setup_logging(
-    debug: bool,
-    logfile: Option<&str>,
-) -> Result<(), log::SetLoggerError> {
+fn setup_logging(debug: bool, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
     let level_filter = if debug {
         log::LevelFilter::Debug
     } else {
@@ -142,7 +139,6 @@ fn args<'a>() -> ArgMatches<'a> {
 
     matches.get_matches()
 }
-
 
 fn main() -> Result<(), std::io::Error> {
     let matches = args();

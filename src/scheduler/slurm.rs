@@ -46,7 +46,6 @@ pub struct SlurmJobEntry {
 }
 
 impl SlurmJobEntry {
-
     /// Returns a new SlurmJobEntry with the given path to the job info and the given job ID
     ///
     /// # Arguments

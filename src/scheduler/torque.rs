@@ -33,7 +33,6 @@ use super::Scheduler;
 
 use crate::utils;
 
-
 pub struct TorqueJobEntry {
     /// The full path to the file that needs to be archived
     /// This should be the `.SC` (script) file
