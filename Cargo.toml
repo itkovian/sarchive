@@ -8,7 +8,7 @@ license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/itkovian/sarchive"
 repository = "https://github.com/itkovian/sarchive"
-keywords = ["slurm", "cli", "archival", "hpc"]
+keywords = ["slurm", "torque", "cli", "archival", "hpc"]
 categories = ["command-line-utilities"]
 
 [badges]
