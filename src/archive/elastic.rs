@@ -162,6 +162,7 @@ impl Archive for ElasticArchive {
         let doc = JobMessage {
             id: job_entry.jobid().to_owned(),
             timestamp: Utc::now(),
+            cluster: job_entry.cluster().to_owned(),
             script: job_entry.script().to_owned(),
             environment: job_entry.extra_info(),
         };
@@ -177,6 +178,7 @@ struct JobMessage {
     #[elastic(id)]
     pub id: String,
     pub timestamp: DateTime<Utc>,
+    pub cluster: String,
     pub script: String,
     pub environment: Option<HashMap<String, String>>,
 }
