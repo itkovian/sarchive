@@ -171,7 +171,9 @@ fn main() -> Result<(), std::io::Error> {
         _ => panic!("Unsupported scheduler"), // This should have been handled by clap, so never arrive here
     };
     let archiver: Box<dyn Archive> = archive_builder(&matches).unwrap();
-    let cluster = matches.value_of("cluster").expect("Cluster argument is mandatory");
+    let cluster = matches
+        .value_of("cluster")
+        .expect("Cluster argument is mandatory");
 
     info!("sarchive starting. Watching spool {:?}.", &base);
 

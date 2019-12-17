@@ -157,7 +157,6 @@ pub struct Slurm {
 }
 
 impl Slurm {
-
     /// Returns a new Slurm with the base path set.
     ///
     /// # Arguments
@@ -185,7 +184,6 @@ impl Slurm {
 }
 
 impl Scheduler for Slurm {
-
     /// Return a `Vector` with the locations that need to be watched.
     ///
     /// The is the base path + hash.{0..9}
