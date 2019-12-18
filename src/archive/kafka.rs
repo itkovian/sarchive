@@ -89,10 +89,12 @@ impl KafkaArchive {
     }
 }
 
+#[cfg(feature = "kafka")]
 #[derive(Serialize, Deserialize)]
 struct JobMessage {
     pub id: String,
     pub timestamp: DateTime<Utc>,
+    pub cluster: String,
     pub script: String,
     pub environment: Option<HashMap<String, String>>,
 }
@@ -107,6 +109,7 @@ impl Archive for KafkaArchive {
         let doc = JobMessage {
             id: job_entry.jobid().to_owned(),
             timestamp: Utc::now(),
+            cluster: job_entry.cluster().to_owned(),
             script: job_entry.script().to_owned(),
             environment: job_entry.extra_info().to_owned(),
         };

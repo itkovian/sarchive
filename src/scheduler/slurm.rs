@@ -37,6 +37,8 @@ pub struct SlurmJobEntry {
     pub path_: PathBuf,
     /// The job ID
     jobid_: String,
+    /// The name of the cluster
+    cluster_: String,
     /// Time of event notification and instance creation
     moment_: Instant,
     /// The actual job script
@@ -56,19 +58,22 @@ impl SlurmJobEntry {
     /// # Examples
     ///
     /// ```
-    /// use std::path::{PathBuf};
+    /// # use std::path::{PathBuf};
+    /// # use sarchive::scheduler::slurm::SlurmJobEntry;
     ///
-    /// let p = PathBuf::new("/var/spool/slurm/hash.2/job.1234");
+    /// let p = PathBuf::from("/var/spool/slurm/hash.2/job.1234");
     /// let id = "1234";
+    /// let cluster = "mycluster";
     ///
-    /// let job_entry = SlurmJobEntry::new(&p, &id);
+    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster);
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
-    pub fn new(path: &PathBuf, id: &str) -> SlurmJobEntry {
+    pub fn new(path: &PathBuf, id: &str, cluster: &str) -> SlurmJobEntry {
         SlurmJobEntry {
             path_: path.clone(),
             jobid_: id.to_string(),
+            cluster_: cluster.to_string(),
             moment_: Instant::now(),
             script_: None,
             env_: None,
@@ -77,20 +82,32 @@ impl SlurmJobEntry {
 }
 
 impl JobInfo for SlurmJobEntry {
+    /// Returns the job ID as a `String`
     fn jobid(&self) -> String {
         self.jobid_.clone()
     }
 
+    /// Returns the time the jpb entry was created by SArchive
     fn moment(&self) -> Instant {
         self.moment_
     }
 
+    // Return the cluster to which the job was submitted
+    fn cluster(&self) -> String {
+        self.cluster_.clone()
+    }
+
+    /// Populates the job entry structure with the relevant information
+    ///
+    /// For Slurm, this encompasses the job script and the job environment
     fn read_job_info(&mut self) -> Result<(), Error> {
         self.script_ = Some(utils::read_file(&self.path_, &Path::new("script"))?);
         self.env_ = Some(utils::read_file(&self.path_, &Path::new("environment"))?);
         Ok(())
     }
 
+    /// Returns a `Vector` with tuples containing the filename and the
+    /// file contents for the script and environment files
     fn files(&self) -> Vec<(String, String)> {
         [
             ("script", self.script_.as_ref()),
@@ -103,6 +120,7 @@ impl JobInfo for SlurmJobEntry {
         .collect()
     }
 
+    /// Returns the job script as a `String`
     fn script(&self) -> String {
         match &self.script_ {
             Some(s) => s.clone(),
@@ -110,6 +128,8 @@ impl JobInfo for SlurmJobEntry {
         }
     }
 
+    /// Returns the environment info (if any) as a HashMap, mapping env keys
+    /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
         self.env_.as_ref().map(|s| {
             s.split('\0')
@@ -129,28 +149,66 @@ impl JobInfo for SlurmJobEntry {
     }
 }
 
+/// Representation of the Slurm scheduler
 pub struct Slurm {
+    /// The absolute path to the spool directory
     pub base: PathBuf,
+    pub cluster: String,
 }
 
 impl Slurm {
-    pub fn new(base: &PathBuf) -> Slurm {
-        Slurm { base: base.clone() }
+    /// Returns a new Slurm with the base path set.
+    ///
+    /// # Arguments
+    ///
+    /// * `base`: a PathBuf reference
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use std::path::PathBuf;
+    /// # use sarchive::scheduler::slurm::Slurm;
+    ///
+    /// let base = PathBuf::from("/var/spool/slurm/hash.3/5678");
+    ///
+    /// let slurm = Slurm::new(&base, "mycluster");
+    ///
+    /// assert_eq!(slurm.base, base);
+    /// ```
+    pub fn new(base: &PathBuf, cluster: &str) -> Slurm {
+        Slurm {
+            base: base.clone(),
+            cluster: cluster.to_string(),
+        }
     }
 }
 
 impl Scheduler for Slurm {
+    /// Return a `Vector` with the locations that need to be watched.
+    ///
+    /// The is the base path + hash.{0..9}
+    ///
+    /// # Arguments
+    ///
+    /// * _matches: reference the ArgMatches in case we pass command line
+    ///             options, which is not done atm.
     fn watch_locations(&self, _matches: &ArgMatches) -> Vec<PathBuf> {
         (0..=9)
             .map(|hash| self.base.join(format!("hash.{}", hash)).to_owned())
             .collect()
     }
 
+    /// Returns a Box wrapping the actual job info data structure.App
+    ///
+    /// # Arguments
+    ///
+    /// * event_path: A `Path to the job directory that
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, _dirname)) = is_job_path(&event_path) {
             Some(Box::new(SlurmJobEntry::new(
                 &event_path.to_path_buf(),
                 jobid,
+                &self.cluster,
             )))
         } else {
             None
@@ -220,7 +278,7 @@ mod tests {
     #[test]
     fn test_read_job_info() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456");
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
         slurm_job_entry.read_job_info().unwrap();
 
         if let Some(hm) = slurm_job_entry.extra_info() {

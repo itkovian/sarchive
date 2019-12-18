@@ -41,6 +41,8 @@ pub struct TorqueJobEntry {
     jobname_: Option<String>,
     /// The job ID
     jobid_: String,
+    /// The name of the cluster
+    cluster_: String,
     /// Time of event notification and instance creation
     moment_: Instant,
     /// The actual job script
@@ -50,10 +52,11 @@ pub struct TorqueJobEntry {
 }
 
 impl TorqueJobEntry {
-    fn new(p: &PathBuf, id: &str) -> TorqueJobEntry {
+    fn new(p: &PathBuf, id: &str, cluster: &str) -> TorqueJobEntry {
         TorqueJobEntry {
             path_: p.clone(),
             jobname_: None,
+            cluster_: cluster.to_string(),
             jobid_: id.to_owned(),
             moment_: Instant::now(),
             script_: None,
@@ -70,6 +73,11 @@ impl JobInfo for TorqueJobEntry {
     // Return the moment of event occurence
     fn moment(&self) -> Instant {
         self.moment_
+    }
+
+    // Return the cluster to which the job was submitted
+    fn cluster(&self) -> String {
+        self.cluster_.clone()
     }
 
     // Retrieve all the information for the job from the spool location
@@ -154,11 +162,15 @@ impl JobInfo for TorqueJobEntry {
 
 pub struct Torque {
     pub base: PathBuf,
+    pub cluster: String,
 }
 
 impl Torque {
-    pub fn new(base: &PathBuf) -> Torque {
-        Torque { base: base.clone() }
+    pub fn new(base: &PathBuf, cluster: &str) -> Torque {
+        Torque {
+            base: base.clone(),
+            cluster: cluster.to_string(),
+        }
     }
 }
 
@@ -182,6 +194,7 @@ impl Scheduler for Torque {
             Some(Box::new(TorqueJobEntry::new(
                 &filename.to_path_buf(),
                 jobid,
+                &self.cluster,
             )))
         } else {
             None

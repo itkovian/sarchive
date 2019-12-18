@@ -139,7 +139,7 @@ mod tests {
 
         scope(|s| {
             let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-            let slurm_job_entry = SlurmJobEntry::new(&path, "123456");
+            let slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
             s.spawn(move |_| match process(archiver, &rx1, &rx2, false) {
                 Ok(v) => assert_eq!(v, ()),
                 Err(_) => panic!("Unexpected error from process function"),

@@ -19,35 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-
-pub mod job;
-pub mod slurm;
-pub mod torque;
-
-use clap::ArgMatches;
-use notify::event::Event;
-use std::path::{Path, PathBuf};
-
-use job::JobInfo;
-
-/// Denotes the schedulers SArchive supports
-pub enum SchedulerKind {
-    Slurm,
-    Torque,
-}
-
-pub trait Scheduler: Send + Sync {
-    fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf>;
-    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
-    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>>;
-}
-
-pub fn create(kind: &SchedulerKind, spool_path: &PathBuf, cluster: &str) -> Box<dyn Scheduler> {
-    match kind {
-        SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster)),
-        SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path, cluster)),
-    }
-}
-
-#[cfg(test)]
-mod tests {}
+pub mod archive;
+pub mod monitor;
+pub mod scheduler;
+pub mod utils;

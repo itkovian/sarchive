@@ -102,6 +102,13 @@ fn args<'a>() -> ArgMatches<'a> {
                 )
         )
         .arg(
+            Arg::with_name("cluster")
+                .long("cluster")
+                .takes_value(true)
+                .required(true)
+                .help("The cluster for which job information is archived")
+        )
+        .arg(
             Arg::with_name("logfile")
                 .long("logfile")
                 .short("l")
@@ -164,6 +171,9 @@ fn main() -> Result<(), std::io::Error> {
         _ => panic!("Unsupported scheduler"), // This should have been handled by clap, so never arrive here
     };
     let archiver: Box<dyn Archive> = archive_builder(&matches).unwrap();
+    let cluster = matches
+        .value_of("cluster")
+        .expect("Cluster argument is mandatory");
 
     info!("sarchive starting. Watching spool {:?}.", &base);
 
@@ -179,7 +189,7 @@ fn main() -> Result<(), std::io::Error> {
 
     // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
-    let sched = create(&scheduler_kind, &base.to_path_buf());
+    let sched = create(&scheduler_kind, &base.to_path_buf(), cluster);
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {

@@ -31,6 +31,9 @@ pub trait JobInfo: Send {
     // Return the moment of event occurence
     fn moment(&self) -> Instant;
 
+    // Return the cluster to which the job was submitted
+    fn cluster(&self) -> String;
+
     // Retrieve all the information for the job from the spool location
     // This fills up the required data structures to be able to write
     // the backup or ship the information to some consumer
