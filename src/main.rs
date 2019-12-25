@@ -102,13 +102,6 @@ fn args<'a>() -> ArgMatches<'a> {
                 )
         )
         .arg(
-            Arg::with_name("cluster")
-                .long("cluster")
-                .takes_value(true)
-                .required(true)
-                .help("The cluster for which job information is archived")
-        )
-        .arg(
             Arg::with_name("logfile")
                 .long("logfile")
                 .short("l")
