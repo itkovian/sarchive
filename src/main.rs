@@ -87,6 +87,7 @@ fn args<'a>() -> ArgMatches<'a> {
                 .long("cluster")
                 .short("c")
                 .takes_value(true)
+                .required(true)
                 .help("Name of the cluster where the jobs have been submitted to."),
         )
         .arg(
