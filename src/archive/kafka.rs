@@ -105,6 +105,10 @@ impl Archive for KafkaArchive {
             "Kafka archiver, received an entry for job ID {}",
             job_entry.jobid()
         );
+        debug!(
+            "Kafka producer currently has {} inflight messages",
+            self.producer.in_flight_count()
+        );
 
         let doc = JobMessage {
             id: job_entry.jobid().to_owned(),
@@ -116,13 +120,14 @@ impl Archive for KafkaArchive {
 
         if let Ok(serial) = serde_json::to_string(&doc) {
             self.producer
-                .send::<str, str>(FutureRecord::to(&self.topic).payload(&serial), 0);
-            /*.map(move |delivery_status| {
-                debug!("Kafka delivery status received for message: {}", serial);
-                delivery_status
-            });*/
+                .send::<str, str>(FutureRecord::to(&self.topic).payload(&serial), 0)
+                /*.map(move |delivery_status| {
+                    debug!("Kafka delivery status received for message: {}", serial);
+                    delivery_status
+                })*/;
             Ok(())
         } else {
+            debug!("Unserialisable job information");
             Err(Error::new(
                 ErrorKind::InvalidData,
                 "Cannot convert job info to JSON",
