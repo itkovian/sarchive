@@ -139,12 +139,12 @@ impl JobInfo for SlurmJobEntry {
                         let ps: Vec<_> = s.split('=').collect();
                         match ps.len() {
                             2 => {
-                                    if !ps[0].trim().is_empty() {
-                                        Some((ps[0].to_owned(), ps[1].to_owned()))
-                                    } else {
-                                        None
-                                    }
-                                },
+                                if !ps[0].trim().is_empty() {
+                                    Some((ps[0].to_owned(), ps[1].to_owned()))
+                                } else {
+                                    None
+                                }
+                            }
                             _ => Some((s.to_owned(), String::from(""))),
                         }
                     } else {
