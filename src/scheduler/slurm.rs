@@ -201,7 +201,7 @@ impl Scheduler for Slurm {
     ///             options, which is not done atm.
     fn watch_locations(&self, _matches: &ArgMatches) -> Vec<PathBuf> {
         (0..=9)
-            .map(|hash| self.base.join(format!("hash.{}", hash)).to_owned())
+            .map(|hash| self.base.join(format!("hash.{}", hash)))
             .collect()
     }
 
