@@ -107,11 +107,11 @@ impl Archive for KafkaArchive {
         );
 
         let doc = JobMessage {
-            id: job_entry.jobid().to_owned(),
+            id: job_entry.jobid(),
             timestamp: Utc::now(),
-            cluster: job_entry.cluster().to_owned(),
-            script: job_entry.script().to_owned(),
-            environment: job_entry.extra_info().to_owned(),
+            cluster: job_entry.cluster(),
+            script: job_entry.script(),
+            environment: job_entry.extra_info(),
         };
 
         if let Ok(serial) = serde_json::to_string(&doc) {

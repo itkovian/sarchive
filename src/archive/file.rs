@@ -160,7 +160,7 @@ fn determine_target_path(archive_path: &Path, p: &Period) -> PathBuf {
                 debug!("Archive subdir {:?} does not yet exist, creating", &d);
                 create_dir_all(&archive_subdir_path).unwrap();
             }
-            archive_subdir_path.clone()
+            archive_subdir_path
         }
         None => archive_path.to_path_buf(),
     }

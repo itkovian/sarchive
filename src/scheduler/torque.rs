@@ -95,7 +95,7 @@ impl JobInfo for TorqueJobEntry {
             let ta_filename = filename.with_extension("TA");
             let ta = utils::read_file(dir, &ta_filename)?;
             self.env_
-                .insert(ta_filename.to_str().unwrap().to_string(), ta.to_owned());
+                .insert(ta_filename.to_str().unwrap().to_string(), ta);
             // If the job is an array job, there are multiple JB files.
             // The file name pattern is: 2720868-946.master.cluster.JB
             // Split the filename into appropriate parts
@@ -107,14 +107,14 @@ impl JobInfo for TorqueJobEntry {
                         let jb_dir = jb_path.parent()?;
                         let jb_filename = jb_path.strip_prefix(&jb_dir).unwrap();
                         let jb = utils::read_file(&jb_dir, &jb_filename).unwrap();
-                        Some((jb_filename.to_owned(), jb.to_owned()))
+                        Some((jb_filename.to_owned(), jb))
                     } else {
                         None
                     }
                 })
                 .map(|(jb_filename, jb)| {
                     self.env_
-                        .insert(jb_filename.to_str().unwrap().to_string(), jb.to_owned());
+                        .insert(jb_filename.to_str().unwrap().to_string(), jb);
                     Some(())
                 })
                 .for_each(drop);
@@ -125,7 +125,7 @@ impl JobInfo for TorqueJobEntry {
                 let jb = utils::read_file(dir, &jb_filename)?;
 
                 self.env_
-                    .insert(jb_filename.to_str().unwrap().to_string(), jb.to_owned());
+                    .insert(jb_filename.to_str().unwrap().to_string(), jb);
             }
         }
         Ok(())
@@ -178,7 +178,7 @@ impl Scheduler for Torque {
     fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf> {
         if matches.is_present("subdirs") {
             (0..=9)
-                .map(|sd| self.base.join(format!("{}", sd)).to_owned())
+                .map(|sd| self.base.join(format!("{}", sd)))
                 .collect()
         } else {
             [self.base.clone()].to_vec()

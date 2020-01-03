@@ -123,7 +123,7 @@ impl ElasticArchive {
         // We create the index if it does not exist
         if let Ok(response) = client.index(index.to_owned()).exists().send() {
             if !response.exists() {
-                create_index(&client, index.to_owned()).unwrap();
+                create_index(&client, index).unwrap();
             }
         } else {
             error!("Cannot check if index exists. Quitting.");
@@ -160,10 +160,10 @@ impl Archive for ElasticArchive {
         );
 
         let doc = JobMessage {
-            id: job_entry.jobid().to_owned(),
+            id: job_entry.jobid(),
             timestamp: Utc::now(),
-            cluster: job_entry.cluster().to_owned(),
-            script: job_entry.script().to_owned(),
+            cluster: job_entry.cluster(),
+            script: job_entry.script(),
             environment: job_entry.extra_info(),
         };
         let _res = self.client.document().index(doc).send().unwrap();
