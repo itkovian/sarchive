@@ -134,10 +134,17 @@ impl JobInfo for SlurmJobEntry {
         self.env_.as_ref().map(|s| {
             s.split('\0')
                 .filter_map(|s| {
+                    let s = s.trim();
                     if !s.is_empty() {
                         let ps: Vec<_> = s.split('=').collect();
                         match ps.len() {
-                            2 => Some((ps[0].to_owned(), ps[1].to_owned())),
+                            2 => {
+                                    if !ps[0].trim().is_empty() {
+                                        Some((ps[0].to_owned(), ps[1].to_owned()))
+                                    } else {
+                                        None
+                                    }
+                                },
                             _ => Some((s.to_owned(), String::from(""))),
                         }
                     } else {
