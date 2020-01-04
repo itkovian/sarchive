@@ -26,7 +26,7 @@ use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
 use log::{debug, info};
 use rdkafka::config::ClientConfig;
-use rdkafka::producer::{FutureProducer, FutureRecord};
+use rdkafka::producer::{BaseRecord, DefaultProducerContext, ThreadedProducer};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::collections::HashMap;
@@ -59,7 +59,7 @@ pub fn clap_subcommand(command: &str) -> App {
 }
 
 pub struct KafkaArchive {
-    producer: FutureProducer,
+    producer: ThreadedProducer<DefaultProducerContext>,
     topic: String,
 }
 
@@ -116,7 +116,7 @@ impl Archive for KafkaArchive {
 
         if let Ok(serial) = serde_json::to_string(&doc) {
             self.producer
-                .send::<str, str>(FutureRecord::to(&self.topic).payload(&serial), 0);
+                .send::<str, str>(BaseRecord::to(&self.topic).payload(&serial));
             /*.map(move |delivery_status| {
                 debug!("Kafka delivery status received for message: {}", serial);
                 delivery_status
