@@ -115,13 +115,14 @@ impl Archive for KafkaArchive {
         };
 
         if let Ok(serial) = serde_json::to_string(&doc) {
-            self.producer
-                .send::<str, str>(BaseRecord::to(&self.topic).payload(&serial));
-            /*.map(move |delivery_status| {
-                debug!("Kafka delivery status received for message: {}", serial);
-                delivery_status
-            });*/
-            Ok(())
+            match self.producer
+                .send::<str, str>(BaseRecord::to(&self.topic).payload(&serial)) {
+                Ok(_) => Ok(()),
+                Err((_e, _)) => {
+                    debug!("Could not produce job entry");
+                    Ok(())
+                }
+            }
         } else {
             Err(Error::new(
                 ErrorKind::InvalidData,
