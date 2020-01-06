@@ -207,8 +207,10 @@ fn main() -> Result<(), std::io::Error> {
         let r = &receiver;
         let sr = &sig_receiver;
         s.spawn(move |_| {
-            process(archiver, r, sr, cleanup)
-            debug!("Processing done");
+            match process(archiver, r, sr, cleanup) {
+                Ok(()) => info!("Processing completed succesfully"),
+                Err(e) => error!("processing failed: {:?}", e)
+            };
         });
     }) {
         error!("sarchive stopping due to error: {:?}", e);
