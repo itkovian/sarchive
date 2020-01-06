@@ -106,6 +106,7 @@ pub fn process(
             }
         }
     }
+    debug!("Processing loop exited");
     Ok(())
 }
 
