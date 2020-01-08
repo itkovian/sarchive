@@ -26,6 +26,7 @@ use std::collections::HashMap;
 use std::io::Error;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use std::string::String;
 
 use super::job::JobInfo;
 use super::Scheduler;
@@ -131,28 +132,32 @@ impl JobInfo for SlurmJobEntry {
     /// Returns the environment info (if any) as a HashMap, mapping env keys
     /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
-        self.env_.as_ref().map(|s| {
-            s.split('\0')
-                .filter_map(|s| {
-                    let s = s.trim();
-                    if !s.is_empty() {
-                        let ps: Vec<_> = s.split('=').collect();
-                        match ps.len() {
-                            2 => {
-                                if !ps[0].trim().is_empty() {
-                                    Some((ps[0].to_owned(), ps[1].to_owned()))
-                                } else {
-                                    None
+
+        self.env_.as_ref().map(
+            |s| {
+                let s = String::from_utf8(s.as_bytes().split_at(4).1.to_vec()).unwrap();
+                s.split('\0')
+                    .filter_map(|s| {
+                        let s = s.trim();
+                        if !s.is_empty() {
+                            let ps: Vec<_> = s.split('=').collect();
+                            match ps.len() {
+                                2 => {
+                                    if !ps[0].trim().is_empty() {
+                                        Some((ps[0].to_owned(), ps[1].to_owned()))
+                                    } else {
+                                        None
+                                    }
                                 }
+                                _ => Some((s.to_owned(), String::from(""))),
                             }
-                            _ => Some((s.to_owned(), String::from(""))),
+                        } else {
+                            None
                         }
-                    } else {
-                        None
-                    }
                 })
-                .collect()
-        })
+                .collect::<HashMap<String, String>>()
+            }
+        )
     }
 }
 
