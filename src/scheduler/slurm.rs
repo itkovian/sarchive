@@ -291,7 +291,7 @@ mod tests {
         slurm_job_entry.read_job_info().unwrap();
 
         if let Some(hm) = slurm_job_entry.extra_info() {
-            assert_eq!(hm.len(), 46);
+            assert_eq!(hm.len(), 45);
             assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
             assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
         } else {
