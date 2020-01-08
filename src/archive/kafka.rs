@@ -115,11 +115,15 @@ impl Archive for KafkaArchive {
         };
 
         if let Ok(serial) = serde_json::to_string(&doc) {
+            debug!("Serialisation succeeded");
             match self
                 .producer
                 .send::<str, str>(BaseRecord::to(&self.topic).payload(&serial))
             {
-                Ok(_) => Ok(()),
+                Ok(_) => {
+                    debug!("Message produced correctly");
+                    Ok(())
+                }
                 Err((_e, _)) => {
                     debug!("Could not produce job entry");
                     Ok(())
