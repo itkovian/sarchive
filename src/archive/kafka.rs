@@ -58,12 +58,27 @@ pub fn clap_subcommand(command: &str) -> App {
         )
 }
 
+/// An archiver to Kafka
 pub struct KafkaArchive {
+    /// The producer sending messages
     producer: ThreadedProducer<DefaultProducerContext>,
+    /// The topic to produce to
     topic: String,
 }
 
 impl KafkaArchive {
+
+    /// Returns a new archiver that produces messagesto Kafka
+    ///
+    /// # Arguments
+    ///
+    /// * `brokers` - a str slice that contains a comma-separated
+    ///               list of brokers to talk to. A single broker
+    ///               usually suffices, as the first information
+    ///               that is retrieved is the full list of brokers
+    ///               that comprise the Kafka service
+    /// * `topic` - a str slice representing the topic to produce to
+    /// * `message_timeout` - timeout in ms for sent messages
     pub fn new(brokers: &str, topic: &str, message_timeout: &str) -> Self {
         KafkaArchive {
             producer: ClientConfig::new()
