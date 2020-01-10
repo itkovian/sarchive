@@ -63,9 +63,7 @@ pub fn read_file(path: &Path, filename: &Path) -> Result<Vec<u8>, Error> {
                 format!("File {:?} did not appear after waiting 1s", &fpath),
             ))
         }
-        _ => {
-            fs::read(&fpath)
-        }
+        _ => fs::read(&fpath),
     }
 }
 

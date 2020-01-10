@@ -48,7 +48,6 @@ pub struct SlurmJobEntry {
     env_: Option<Vec<u8>>,
 }
 
-
 impl SlurmJobEntry {
     /// Returns a new SlurmJobEntry with the given path to the job info and the given job ID
     ///
@@ -310,9 +309,7 @@ mod tests {
         }
 
         if let Some(hm) = slurm_job_entry.extra_info() {
-
-        }
-        else {
+        } else {
             assert!(false);
         }
     }

@@ -156,10 +156,12 @@ impl JobInfo for TorqueJobEntry {
 
     // Return additional information as a set of key-value pairs
     fn extra_info(&self) -> Option<HashMap<String, String>> {
-        Some(self.env_
-            .iter()
-            .map(|(k, v)| (k.clone(), String::from_utf8_lossy(&v).to_string()))
-            .collect())
+        Some(
+            self.env_
+                .iter()
+                .map(|(k, v)| (k.clone(), String::from_utf8_lossy(&v).to_string()))
+                .collect(),
+        )
     }
 }
 

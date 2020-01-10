@@ -209,7 +209,7 @@ fn main() -> Result<(), std::io::Error> {
         s.spawn(move |_| {
             match process(archiver, r, sr, cleanup) {
                 Ok(()) => info!("Processing completed succesfully"),
-                Err(e) => error!("processing failed: {:?}", e)
+                Err(e) => error!("processing failed: {:?}", e),
             };
         });
     }) {
