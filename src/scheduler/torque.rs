@@ -46,9 +46,9 @@ pub struct TorqueJobEntry {
     /// Time of event notification and instance creation
     moment_: Instant,
     /// The actual job script
-    script_: Option<String>,
+    script_: Option<Vec<u8>>,
     /// Additional info for the job
-    env_: HashMap<String, String>,
+    env_: HashMap<String, Vec<u8>>,
 }
 
 impl TorqueJobEntry {
@@ -133,15 +133,15 @@ impl JobInfo for TorqueJobEntry {
 
     // Return a Vec of tuples with the filename and file contents for
     // each file that needs to be written as a backup
-    fn files(&self) -> Vec<(String, String)> {
-        let mut fs: Vec<(String, String)> = Vec::new();
+    fn files(&self) -> Vec<(String, Vec<u8>)> {
+        let mut fs: Vec<(String, Vec<u8>)> = Vec::new();
         if let Some(jn) = &self.jobname_ {
             if let Some(script) = &self.script_ {
-                fs.push((jn.to_string(), script.to_string()));
+                fs.push((jn.to_string(), script.to_vec()));
             }
         }
         for (jb, jb_contents) in self.env_.iter() {
-            fs.push((jb.to_string(), jb_contents.to_string()));
+            fs.push((jb.to_string(), jb_contents.to_vec()));
         }
         fs
     }
@@ -149,14 +149,19 @@ impl JobInfo for TorqueJobEntry {
     // Return the actual job script as a String
     fn script(&self) -> String {
         match &self.script_ {
-            Some(s) => s.clone(),
+            Some(s) => String::from_utf8_lossy(&s).to_string(),
             None => panic!("No script available for job {}", self.jobid_),
         }
     }
 
     // Return additional information as a set of key-value pairs
     fn extra_info(&self) -> Option<HashMap<String, String>> {
-        Some(self.env_.clone())
+        Some(
+            self.env_
+                .iter()
+                .map(|(k, v)| (k.clone(), String::from_utf8_lossy(&v).to_string()))
+                .collect(),
+        )
     }
 }
 

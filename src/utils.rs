@@ -37,7 +37,9 @@ use std::time::Duration;
 /// directory from the filename (which may contain directory hierarchy)
 /// is that we are able to monitor the path in case it dissapears (e.g.,
 /// when a job is removed before we can get the information)
-pub fn read_file(path: &Path, filename: &Path) -> Result<String, Error> {
+///
+/// We return the raw bytes, so the contents can be processed later if needed
+pub fn read_file(path: &Path, filename: &Path) -> Result<Vec<u8>, Error> {
     let fpath = path.join(filename);
     let mut iters = 100;
     let ten_millis = Duration::from_millis(10);
@@ -61,10 +63,7 @@ pub fn read_file(path: &Path, filename: &Path) -> Result<String, Error> {
                 format!("File {:?} did not appear after waiting 1s", &fpath),
             ))
         }
-        _ => {
-            let data = fs::read_to_string(&fpath)?;
-            Ok(data)
-        }
+        _ => fs::read(&fpath),
     }
 }
 

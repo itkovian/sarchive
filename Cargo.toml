@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.11.3"
+version = "0.11.4"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2018"
 description = "Archival tool for slurm job scripts"
@@ -33,10 +33,10 @@ signal-hook = "^0.1.12"
 
 elastic = { version = "~0.21.0-pre.5", optional = true }
 elastic_derive = { version = "~0.21.0-pre.5", optional = true }
-serde = { version = "^1.0.103", features = ["derive"], optional = true }
-serde_derive = { version = "^1.0.103", optional = true }
-serde_json = { version = "^1.0.42", optional = true }
-rdkafka = { version = "0.22.0", optional = true }
+serde = { version = "^1.0", features = ["derive"], optional = true }
+serde_derive = { version = "^1.0", optional = true }
+serde_json = { version = "^1.0", optional = true }
+rdkafka = { version = "0.23.0", optional = true }
 
 [lib]
 name = "sarchive"

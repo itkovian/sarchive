@@ -29,7 +29,7 @@ pub mod kafka;
 
 use clap::ArgMatches;
 use crossbeam_channel::{select, Receiver};
-use log::{error, info};
+use log::{debug, error, info};
 use std::io::{Error, ErrorKind};
 
 #[cfg(feature = "elasticsearch-7")]
@@ -106,6 +106,7 @@ pub fn process(
             }
         }
     }
+    debug!("Processing loop exited");
     Ok(())
 }
 

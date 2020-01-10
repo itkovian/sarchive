@@ -72,30 +72,47 @@ pub struct ElasticArchive {
 fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
     let body = json!({
         "mappings": {
-            "dynamic": false,
+            "dynamic": true,
             "properties": {
-                "environment": {
-                    "type": "object",
-                    "dynamic": true,
-                },
-                "id": {
-                    "type": "text",
-                    "fields": {
-                        "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
-                        }
-                    }
-                },
-                "timestamp": {
+                "dynamic": true,
+                "@timestamp": {
                     "type": "date"
                 },
-                "script": {
-                    "type": "text",
-                    "fields": {
-                        "keyword": {
-                            "type": "keyword",
-                            "ignore_above": 256
+                "jobinfo": {
+                    "properties": {
+                        "environment": {
+                            "type": "object",
+                            "dynamic": false
+                        },
+                        "id": {
+                            "type": "text",
+                            "fields": {
+                                "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256
+                                }
+                            }
+                        },
+                        "cluster": {
+                            "type": "text",
+                            "fields": {
+                                "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256
+                                }
+                            }
+                        },
+                        "timestamp": {
+                            "type": "date"
+                        },
+                        "script": {
+                            "type": "text",
+                            "fields": {
+                                "keyword": {
+                                    "type": "keyword",
+                                    "ignore_above": 256
+                                }
+                            }
                         }
                     }
                 }

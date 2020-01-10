@@ -41,7 +41,7 @@ pub trait JobInfo: Send {
 
     // Return a Vec of tuples with the filename and file contents for
     // each file that needs to be written as a backup
-    fn files(&self) -> Vec<(String, String)>;
+    fn files(&self) -> Vec<(String, Vec<u8>)>;
 
     // Return the actual job script as a String
     fn script(&self) -> String;
