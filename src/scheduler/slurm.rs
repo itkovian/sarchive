@@ -25,6 +25,7 @@ use notify::event::{CreateKind, Event, EventKind};
 use std::collections::HashMap;
 use std::io::Error;
 use std::path::{Path, PathBuf};
+use std::string::String;
 use std::time::Instant;
 
 use super::job::JobInfo;
@@ -132,6 +133,7 @@ impl JobInfo for SlurmJobEntry {
     /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
         self.env_.as_ref().map(|s| {
+            let s = String::from_utf8(s.as_bytes().split_at(4).1.to_vec()).unwrap();
             s.split('\0')
                 .filter_map(|s| {
                     let s = s.trim();
@@ -151,7 +153,7 @@ impl JobInfo for SlurmJobEntry {
                         None
                     }
                 })
-                .collect()
+                .collect::<HashMap<String, String>>()
         })
     }
 }
@@ -289,7 +291,7 @@ mod tests {
         slurm_job_entry.read_job_info().unwrap();
 
         if let Some(hm) = slurm_job_entry.extra_info() {
-            assert_eq!(hm.len(), 46);
+            assert_eq!(hm.len(), 45);
             assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
             assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
         } else {

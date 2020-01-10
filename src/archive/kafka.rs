@@ -123,7 +123,7 @@ impl Archive for KafkaArchive {
                 Ok(_) => {
                     debug!("Message produced correctly");
                     Ok(())
-                },
+                }
                 Err((_e, _)) => {
                     debug!("Could not produce job entry");
                     Ok(())
