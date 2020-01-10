@@ -43,10 +43,11 @@ pub struct SlurmJobEntry {
     /// Time of event notification and instance creation
     moment_: Instant,
     /// The actual job script
-    script_: Option<String>,
+    script_: Option<Vec<u8>>,
     /// The job's environment in Slurm
-    env_: Option<String>,
+    env_: Option<Vec<u8>>,
 }
+
 
 impl SlurmJobEntry {
     /// Returns a new SlurmJobEntry with the given path to the job info and the given job ID
@@ -109,14 +110,14 @@ impl JobInfo for SlurmJobEntry {
 
     /// Returns a `Vector` with tuples containing the filename and the
     /// file contents for the script and environment files
-    fn files(&self) -> Vec<(String, String)> {
+    fn files(&self) -> Vec<(String, Vec<u8>)> {
         [
             ("script", self.script_.as_ref()),
             ("environment", self.env_.as_ref()),
         ]
         .iter()
         .filter_map(|(filename, v)| {
-            v.map(|s| (format!("job.{}_{}", self.jobid_, filename), s.to_string()))
+            v.map(|s| (format!("job.{}_{}", self.jobid_, filename), s.to_owned()))
         })
         .collect()
     }
@@ -124,7 +125,7 @@ impl JobInfo for SlurmJobEntry {
     /// Returns the job script as a `String`
     fn script(&self) -> String {
         match &self.script_ {
-            Some(s) => s.clone(),
+            Some(s) => String::from_utf8_lossy(s).to_string(),
             None => panic!("No script available for job {}", self.jobid_),
         }
     }
@@ -133,7 +134,7 @@ impl JobInfo for SlurmJobEntry {
     /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
         self.env_.as_ref().map(|s| {
-            let s = String::from_utf8(s.as_bytes().split_at(4).1.to_vec()).unwrap();
+            let s = String::from_utf8_lossy(&s.split_at(4).1.to_vec()).to_string();
             s.split('\0')
                 .filter_map(|s| {
                     let s = s.trim();
@@ -295,6 +296,23 @@ mod tests {
             assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
             assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
         } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn test_extra_info_drop_u32_prefix() {
+        let path = PathBuf::from(current_dir().unwrap().join("tests/job.8897161"));
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster");
+        if let Err(e) = slurm_job_entry.read_job_info() {
+            println!("Could not read job info: {:?}", e);
+            assert!(false);
+        }
+
+        if let Some(hm) = slurm_job_entry.extra_info() {
+
+        }
+        else {
             assert!(false);
         }
     }

@@ -131,7 +131,7 @@ impl Archive for FileArchive {
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
             let mut f = File::create(target_path.join(&fname))?;
-            f.write_all(fcontents.as_bytes())?;
+            f.write_all(&fcontents)?;
         }
         Ok(())
     }
