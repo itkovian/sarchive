@@ -10,7 +10,9 @@ SArchive
 
 Archival tool for scheduler job scripts and accompanying files.
 
-Note that the version on crates.io is older and only supports Slurm and archival to files. The reason is that we rely on several 3rd party crates that need to be published before we can publish a new version.
+Note that the master branch here may be running ahead of the latest release
+on crates.io. During development, we sometimes rely on dependencies
+that have not yet released a version with the features we use.
 
 ## Minimum supported `rustc`
 
@@ -18,39 +20,47 @@ Note that the version on crates.io is older and only supports Slurm and archival
 
 This version is what we test against in CI. We also test on
   - stable
-  - beta
   - nightly
 
-for both Linux and MacOS.
-
-If you do not have [Rust](https://rustlang.org), please see [Rustup](https://rustup.rs) for installation instructions.
+If you do not have [Rust](https://rustlang.org), please see
+[Rustup](https://rustup.rs) for installation instructions.
 
 ## Usage
 
-`sarchive` requires that the paths to the scheduler's main spool directory is specified.
+`sarchive` requires that the paths to the scheduler's main spool directory is
+specified. It also requires a `cluster` (the cluster name) to be set.
 
 `sarchive` supports multiple schedulers, the one to use should also be specified
 on the command line. Right now, there is support for [Slurm](https://slurm.schedmd.com)
 and [Torque](https://adaptivecomputing.com).
 
-Furthermore, `sarchive` offers various backends. The basic backend writes a copy of the job scripts
-and associated files to a directory on a mounted filesystem. We also have limited support for
-sending job information to [Elasticsearch](https://elastic.co) or produce to
-a [Kafka](https://kafka.apache.org) topic. We briefly discuss these backends below.
+For Slurm, the directory to watch is the `
+
+Furthermore, `sarchive` offers various backends. The basic backend writes a
+copy of the job scripts and associated files to a directory on a mounted
+filesystem. We also have limited support for sending job information to
+[Elasticsearch](https://elastic.co) or produce to a
+[Kafka](https://kafka.apache.org) topic. We briefly discuss these backends
+below.
 
 ### File archival
 
-For file archival, `sarchive` requires the path to the archive's top directory.
+Activated using the `file` subcommand. Note that we do not support multiple
+subcommands at this moment.
+
+For file archival, `sarchive` requires the path to the archive's top
+directory, i.e., where you want to store the backup scripts and accompanying
+files.
 
 The archive can be further divided into subdirectories per
   - year: YYYY, by provinding `--period=yearly`
   - month: YYYYMM, by providing `--period=monthly`
   - day: YYYYMMDD, by providing `--period=daily`
-This allows for easily tarring old(er) directories you still wish to keep around,
-but probably no longer immediately need for user support. Each of these directories
-are also created upon file archival if they do not exist.
+This allows for easily tarring old(er) directories you still wish to keep
+around, but probably no longer immediately need for user support. Each of
+these directories are also created upon file archival if they do not exist.
 
-For example, `sarchive -s /var/spool/slurm -a /var/backups/slurm/job-archive`
+For example, `sarchive --cluster huppel -s /var/spool/slurm file --archive /var/backups/slurm/job-archive`
 
 ### Elasticsearch archival
 
@@ -60,9 +70,13 @@ and potentially other relevant information (at the scheduler's discretion).
 
 We do not yet support SSL/TLS or authentication with the ES backend.
 
+For example, `sarchive --cluster huppel -s /var/spool/slurm elasticsearch --host myelastic.mydomain --index slurm-job-archive`
+
 ### Kafka archival
 
 Similar to ES archival, no SSL/TLS support at this moment. Data is shipped in the same manner.
+
+For example, `./sarchive --cluster huppel -l /var/log/sarchive.log -s /var/spool/slurm/ kafka --brokers mykafka.mydomain:9092 --topic slurm-job-archival`
 
 ## Features
 
