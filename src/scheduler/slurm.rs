@@ -102,7 +102,13 @@ impl JobInfo for SlurmJobEntry {
     ///
     /// For Slurm, this encompasses the job script and the job environment
     fn read_job_info(&mut self) -> Result<(), Error> {
-        self.script_ = Some(utils::read_file(&self.path_, &Path::new("script"))?);
+        self.script_ = {
+            let mut s = utils::read_file(&self.path_, &Path::new("script"))?;
+            if let Some(0) = s.last() {
+                s.pop();
+            }
+            Some(s)
+        };
         self.env_ = Some(utils::read_file(&self.path_, &Path::new("environment"))?);
         Ok(())
     }
