@@ -87,11 +87,11 @@ impl JobInfo for TorqueJobEntry {
         let dir = self.path_.parent().unwrap();
         let filename = self.path_.strip_prefix(&dir).unwrap();
         self.jobname_ = Some(filename.to_str().unwrap().to_string());
-        self.script_ = Some(utils::read_file(&dir, &filename)?);
+        self.script_ = Some(utils::read_file(&dir, &filename, None)?);
 
         // check for the presence of a .TA file
         let ta_filename = filename.with_extension("TA");
-        let ta = utils::read_file(dir, &ta_filename);
+        let ta = utils::read_file(dir, &ta_filename, Some(10));
         if let Ok(ta_contents) = ta {
             self.env_
                 .insert(ta_filename.to_str().unwrap().to_string(), ta_contents);
@@ -105,7 +105,7 @@ impl JobInfo for TorqueJobEntry {
                     if let Ok(jb_path) = jb_path {
                         let jb_dir = jb_path.parent()?;
                         let jb_filename = jb_path.strip_prefix(&jb_dir).unwrap();
-                        let jb = utils::read_file(&jb_dir, &jb_filename).unwrap();
+                        let jb = utils::read_file(&jb_dir, &jb_filename, Some(10)).unwrap();
                         Some((jb_filename.to_owned(), jb))
                     } else {
                         None
@@ -123,7 +123,7 @@ impl JobInfo for TorqueJobEntry {
 
         // If it  was no array job, there should be a single .JB file to pick up.
         let jb_filename = filename.with_extension("JB");
-        let jb = utils::read_file(dir, &jb_filename)?;
+        let jb = utils::read_file(dir, &jb_filename, None)?;
         self.env_
             .insert(jb_filename.to_str().unwrap().to_string(), jb);
         Ok(())

@@ -39,9 +39,9 @@ use std::time::Duration;
 /// when a job is removed before we can get the information)
 ///
 /// We return the raw bytes, so the contents can be processed later if needed
-pub fn read_file(path: &Path, filename: &Path) -> Result<Vec<u8>, Error> {
+pub fn read_file(path: &Path, filename: &Path, iters: Option<u32>) -> Result<Vec<u8>, Error> {
     let fpath = path.join(filename);
-    let mut iters = 100;
+    let mut iters = iters.unwrap_or(100);
     let ten_millis = Duration::from_millis(10);
     while !Path::exists(&fpath) && iters > 0 {
         debug!("Waiting for {:?}", &fpath);
