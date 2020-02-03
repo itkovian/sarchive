@@ -90,12 +90,11 @@ impl JobInfo for TorqueJobEntry {
         self.script_ = Some(utils::read_file(&dir, &filename)?);
 
         // check for the presence of a .TA file
-        if self.path_.with_extension("TA").exists() {
-            // First, get the array file
-            let ta_filename = filename.with_extension("TA");
-            let ta = utils::read_file(dir, &ta_filename)?;
+        let ta_filename = filename.with_extension("TA");
+        let ta = utils::read_file(dir, &ta_filename);
+        if let Ok(ta_contents) = ta {
             self.env_
-                .insert(ta_filename.to_str().unwrap().to_string(), ta);
+                .insert(ta_filename.to_str().unwrap().to_string(), ta_contents);
             // If the job is an array job, there are multiple JB files.
             // The file name pattern is: 2720868-946.master.cluster.JB
             // Split the filename into appropriate parts
@@ -118,16 +117,15 @@ impl JobInfo for TorqueJobEntry {
                     Some(())
                 })
                 .for_each(drop);
-        } else {
-            // check for the single .JB file.
-            if self.path_.with_extension("JB").exists() {
-                let jb_filename = filename.with_extension("JB");
-                let jb = utils::read_file(dir, &jb_filename)?;
 
-                self.env_
-                    .insert(jb_filename.to_str().unwrap().to_string(), jb);
-            }
+            return Ok(());
         }
+
+        // If it  was no array job, there should be a single .JB file to pick up.
+        let jb_filename = filename.with_extension("JB");
+        let jb = utils::read_file(dir, &jb_filename)?;
+        self.env_
+            .insert(jb_filename.to_str().unwrap().to_string(), jb);
         Ok(())
     }
 
@@ -191,10 +189,6 @@ impl Scheduler for Torque {
     }
 
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
-        /*is_job_path(&event_path).map(|(jobid, dirname)| {
-            let t = TorqueJobEntry::new(&dirname.to_path_buf(), jobid);
-            Box::new(t)
-        })*/
         if let Some((jobid, filename)) = is_job_path(&event_path) {
             Some(Box::new(TorqueJobEntry::new(
                 &filename.to_path_buf(),

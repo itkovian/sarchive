@@ -79,6 +79,7 @@ pub fn process(
     cleanup: bool,
 ) -> Result<(), Error> {
     info!("Start processing events");
+
     #[allow(clippy::zero_ptr, clippy::drop_copy)]
     loop {
         select! {
@@ -86,26 +87,27 @@ pub fn process(
                 if !cleanup {
                     info!("Stopped processing entries, {} skipped", r.len());
                 } else {
-                info!("Processing {} entries, then stopping", r.len());
-                for mut entry in r.iter() {
-                    entry.read_job_info()?;
-                    archiver.archive(&entry)?;
-                }
-                info!("Done processing");
+                    info!("Processing {} entries, then stopping", r.len());
+                    for mut entry in r.iter() {
+                        entry.read_job_info()?;
+                        archiver.archive(&entry)?;
+                    }
+                    info!("Done processing");
                 }
                 break;
             },
             recv(r) -> entry => {
-                if let Ok(mut slurm_job_entry) = entry {
-                    slurm_job_entry.read_job_info()?;
-                    archiver.archive(&slurm_job_entry)?;
+                if let Ok(mut job_entry) = entry {
+                    job_entry.read_job_info()?;
+                    archiver.archive(&job_entry)?;
                 } else {
-                    error!("Error on receiving SlurmJobEntry info");
+                    error!("Error on receiving JobEntry info");
                     break;
                 }
             }
         }
     }
+
     debug!("Processing loop exited");
     Ok(())
 }
