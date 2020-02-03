@@ -24,8 +24,6 @@ use log::{debug, error, warn};
 use std::fs::{create_dir_all, File};
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
-use std::thread::sleep;
-use std::time::Duration;
 
 use super::Archive;
 use crate::scheduler::job::JobInfo;
@@ -113,18 +111,7 @@ impl FileArchive {
 impl Archive for FileArchive {
     /// Archives the files from the given SlurmJobEntry's path.
     ///
-    /// We busy wait for 1 second, sleeping for 10 ms per turn for
-    /// the environment and script files to appear.
-    /// If the files cannot be found after that tine, we output a warning
-    /// and return without copying.
-    /// If the directory dissapears before we found or copied the files,
-    /// we panic.
     fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
-        // Simulate the debounced event we had before. Wait two seconds after dir creation event to
-        // have some assurance the files will have been written.
-        if job_entry.moment().elapsed().as_secs() < 2 {
-            sleep(Duration::from_millis(2000) - job_entry.moment().elapsed());
-        }
         let archive_path = &self.archive_path;
         let target_path = determine_target_path(&archive_path, &self.period);
         debug!("Target path: {:?}", target_path);

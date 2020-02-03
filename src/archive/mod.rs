@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2020 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -38,6 +38,8 @@ use self::elastic::ElasticArchive;
 use self::kafka::KafkaArchive;
 use super::scheduler::job::JobInfo;
 use file::FileArchive;
+use std::thread::sleep;
+use std::time::Duration;
 
 /// The Archive trait should be implemented by every backend.
 #[allow(clippy::borrowed_box)]
@@ -79,6 +81,7 @@ pub fn process(
     cleanup: bool,
 ) -> Result<(), Error> {
     info!("Start processing events");
+
     #[allow(clippy::zero_ptr, clippy::drop_copy)]
     loop {
         select! {
@@ -86,26 +89,33 @@ pub fn process(
                 if !cleanup {
                     info!("Stopped processing entries, {} skipped", r.len());
                 } else {
-                info!("Processing {} entries, then stopping", r.len());
-                for mut entry in r.iter() {
-                    entry.read_job_info()?;
-                    archiver.archive(&entry)?;
-                }
-                info!("Done processing");
+                    info!("Processing {} entries, then stopping", r.len());
+                    for mut entry in r.iter() {
+                        entry.read_job_info()?;
+                        archiver.archive(&entry)?;
+                    }
+                    info!("Done processing");
                 }
                 break;
             },
             recv(r) -> entry => {
-                if let Ok(mut slurm_job_entry) = entry {
-                    slurm_job_entry.read_job_info()?;
-                    archiver.archive(&slurm_job_entry)?;
+                if let Ok(mut job_entry) = entry {
+                    // Simulate the debounced event we had before. Wait two seconds after dir creation event to
+                    // have some assurance the files will have been written.
+                    if job_entry.moment().elapsed().as_secs() < 2 {
+                        debug!("Waiting for time to elapse before checking files");
+                        sleep(Duration::from_millis(2000) - job_entry.moment().elapsed());
+                    }
+                    job_entry.read_job_info()?;
+                    archiver.archive(&job_entry)?;
                 } else {
-                    error!("Error on receiving SlurmJobEntry info");
+                    error!("Error on receiving JobEntry info");
                     break;
                 }
             }
         }
     }
+
     debug!("Processing loop exited");
     Ok(())
 }

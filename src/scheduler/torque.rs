@@ -87,26 +87,29 @@ impl JobInfo for TorqueJobEntry {
         let dir = self.path_.parent().unwrap();
         let filename = self.path_.strip_prefix(&dir).unwrap();
         self.jobname_ = Some(filename.to_str().unwrap().to_string());
-        self.script_ = Some(utils::read_file(&dir, &filename)?);
+        self.script_ = Some(utils::read_file(&dir, &filename, None)?);
 
         // check for the presence of a .TA file
-        if self.path_.with_extension("TA").exists() {
-            // First, get the array file
-            let ta_filename = filename.with_extension("TA");
-            let ta = utils::read_file(dir, &ta_filename)?;
+        let ta_filename = filename.with_extension("TA");
+        let ta = utils::read_file(dir, &ta_filename, Some(10));
+        if let Ok(ta_contents) = ta {
             self.env_
-                .insert(ta_filename.to_str().unwrap().to_string(), ta);
+                .insert(ta_filename.to_str().unwrap().to_string(), ta_contents);
             // If the job is an array job, there are multiple JB files.
             // The file name pattern is: 2720868-946.master.cluster.JB
             // Split the filename into appropriate parts
             let fparts = filename.to_str().unwrap().split('.').collect::<Vec<&str>>();
-            glob(&format!("{:?}/{}-*.JB", dir, fparts[0]))
+            debug!(
+                "Found TA file, looking for JB files in {:?} with name {}",
+                dir, fparts[0]
+            );
+            glob(&format!("{}/{}-*.JB", dir.display(), fparts[0]))
                 .unwrap()
                 .filter_map(|jb_path| {
                     if let Ok(jb_path) = jb_path {
                         let jb_dir = jb_path.parent()?;
                         let jb_filename = jb_path.strip_prefix(&jb_dir).unwrap();
-                        let jb = utils::read_file(&jb_dir, &jb_filename).unwrap();
+                        let jb = utils::read_file(&jb_dir, &jb_filename, Some(10)).unwrap();
                         Some((jb_filename.to_owned(), jb))
                     } else {
                         None
@@ -118,16 +121,15 @@ impl JobInfo for TorqueJobEntry {
                     Some(())
                 })
                 .for_each(drop);
-        } else {
-            // check for the single .JB file.
-            if self.path_.with_extension("JB").exists() {
-                let jb_filename = filename.with_extension("JB");
-                let jb = utils::read_file(dir, &jb_filename)?;
 
-                self.env_
-                    .insert(jb_filename.to_str().unwrap().to_string(), jb);
-            }
+            return Ok(());
         }
+
+        // If it  was no array job, there should be a single .JB file to pick up.
+        let jb_filename = filename.with_extension("JB");
+        let jb = utils::read_file(dir, &jb_filename, None)?;
+        self.env_
+            .insert(jb_filename.to_str().unwrap().to_string(), jb);
         Ok(())
     }
 
@@ -191,10 +193,6 @@ impl Scheduler for Torque {
     }
 
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
-        /*is_job_path(&event_path).map(|(jobid, dirname)| {
-            let t = TorqueJobEntry::new(&dirname.to_path_buf(), jobid);
-            Box::new(t)
-        })*/
         if let Some((jobid, filename)) = is_job_path(&event_path) {
             Some(Box::new(TorqueJobEntry::new(
                 &filename.to_path_buf(),
@@ -239,4 +237,59 @@ fn is_job_path(path: &Path) -> Option<(&str, &Path)> {
     }
     debug!("{:?} is not a considered job path", &path);
     None
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use std::env::current_dir;
+
+    #[test]
+    fn test_read_info() {
+        let path = PathBuf::from(
+            current_dir()
+                .unwrap()
+                .join("tests/torque_job.1/1.mymaster.mycluster.SC"),
+        );
+        let mut torque_job_entry = TorqueJobEntry::new(&path, "1", "mycluster");
+        torque_job_entry.read_job_info().unwrap();
+
+        assert!(torque_job_entry
+            .env_
+            .contains_key("1.mymaster.mycluster.JB"));
+        assert_eq!(
+            torque_job_entry.env_.get("1.mymaster.mycluster.JB"),
+            Some(&String::from("<some><xml>M</xml></some>").into_bytes())
+        );
+    }
+
+    #[test]
+    fn test_read_info_job_array() {
+        let path = PathBuf::from(
+            current_dir()
+                .unwrap()
+                .join("tests/torque_job.2/2.mymaster.mycluster.SC"),
+        );
+        let mut torque_job_entry = TorqueJobEntry::new(&path, "2", "mycluster");
+        torque_job_entry.read_job_info().unwrap();
+
+        assert!(torque_job_entry
+            .env_
+            .contains_key("2.mymaster.mycluster.TA"));
+        assert!(torque_job_entry
+            .env_
+            .contains_key("2-1.mymaster.mycluster.JB"));
+        assert!(torque_job_entry
+            .env_
+            .contains_key("2-2.mymaster.mycluster.JB"));
+        assert_eq!(
+            torque_job_entry.env_.get("2-1.mymaster.mycluster.JB"),
+            Some(&String::from("<some><xml>M1</xml></some>").into_bytes())
+        );
+        assert_eq!(
+            torque_job_entry.env_.get("2-2.mymaster.mycluster.JB"),
+            Some(&String::from("<some><xml>M2</xml></some>").into_bytes())
+        );
+    }
 }
