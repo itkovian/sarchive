@@ -99,7 +99,8 @@ impl JobInfo for TorqueJobEntry {
             // The file name pattern is: 2720868-946.master.cluster.JB
             // Split the filename into appropriate parts
             let fparts = filename.to_str().unwrap().split('.').collect::<Vec<&str>>();
-            glob(&format!("{:?}/{}-*.JB", dir, fparts[0]))
+            debug!("Found TA file, looking for JB files in {:?} with name {}", dir, fparts[0]);
+            glob(&format!("{}/{}-*.JB", dir.display(), fparts[0]))
                 .unwrap()
                 .filter_map(|jb_path| {
                     if let Ok(jb_path) = jb_path {
