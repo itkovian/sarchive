@@ -109,7 +109,11 @@ impl JobInfo for SlurmJobEntry {
             }
             Some(s)
         };
-        self.env_ = Some(utils::read_file(&self.path_, &Path::new("environment"), None)?);
+        self.env_ = Some(utils::read_file(
+            &self.path_,
+            &Path::new("environment"),
+            None,
+        )?);
         Ok(())
     }
 
