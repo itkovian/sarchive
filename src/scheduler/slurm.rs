@@ -301,7 +301,6 @@ mod tests {
         assert!(s.script_.unwrap().last() != Some(&0));
     }
 
-
     #[test]
     fn test_read_job_extra_info() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
