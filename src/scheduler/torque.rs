@@ -238,3 +238,35 @@ fn is_job_path(path: &Path) -> Option<(&str, &Path)> {
     debug!("{:?} is not a considered job path", &path);
     None
 }
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use std::env::current_dir;
+
+    #[test]
+    fn test_read_info() {
+        let path = PathBuf::from(current_dir().unwrap().join("tests/torque_job.1/1.mymaster.mycluster.SC"));
+        let mut torque_job_entry = TorqueJobEntry::new(&path, "1", "mycluster");
+        torque_job_entry.read_job_info().unwrap();
+
+        assert!(torque_job_entry.env_.contains_key("1.mymaster.mycluster.JB"));
+        assert_eq!(torque_job_entry.env_.get("1.mymaster.mycluster.JB"), Some(&String::from("<some><xml>M</xml></some>").into_bytes()));
+    }
+
+    #[test]
+    fn test_read_info_job_array() {
+        let path = PathBuf::from(current_dir().unwrap().join("tests/torque_job.2/2.mymaster.mycluster.SC"));
+        let mut torque_job_entry = TorqueJobEntry::new(&path, "2", "mycluster");
+        torque_job_entry.read_job_info().unwrap();
+
+        assert!(torque_job_entry.env_.contains_key("2.mymaster.mycluster.TA"));
+        assert!(torque_job_entry.env_.contains_key("2-1.mymaster.mycluster.JB"));
+        assert!(torque_job_entry.env_.contains_key("2-2.mymaster.mycluster.JB"));
+        assert_eq!(torque_job_entry.env_.get("2-1.mymaster.mycluster.JB"), Some(&String::from("<some><xml>M1</xml></some>").into_bytes()));
+        assert_eq!(torque_job_entry.env_.get("2-2.mymaster.mycluster.JB"), Some(&String::from("<some><xml>M2</xml></some>").into_bytes()));
+    }
+
+}
