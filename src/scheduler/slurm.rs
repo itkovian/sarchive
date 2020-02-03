@@ -102,7 +102,13 @@ impl JobInfo for SlurmJobEntry {
     ///
     /// For Slurm, this encompasses the job script and the job environment
     fn read_job_info(&mut self) -> Result<(), Error> {
-        self.script_ = Some(utils::read_file(&self.path_, &Path::new("script"))?);
+        self.script_ = {
+            let mut s = utils::read_file(&self.path_, &Path::new("script"))?;
+            if let Some(0) = s.last() {
+                s.pop();
+            }
+            Some(s)
+        };
         self.env_ = Some(utils::read_file(&self.path_, &Path::new("environment"))?);
         Ok(())
     }
@@ -285,11 +291,23 @@ mod tests {
     }
 
     #[test]
-    fn test_read_job_info() {
+    fn test_read_job_script_drop_zero() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
         let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
         slurm_job_entry.read_job_info().unwrap();
 
+        // check the script
+        let s = slurm_job_entry;
+        assert!(s.script_.unwrap().last() != Some(&0));
+    }
+
+    #[test]
+    fn test_read_job_extra_info() {
+        let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
+        slurm_job_entry.read_job_info().unwrap();
+
+        // check the environment information
         if let Some(hm) = slurm_job_entry.extra_info() {
             assert_eq!(hm.len(), 45);
             assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
