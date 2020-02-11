@@ -60,7 +60,9 @@ This allows for easily tarring old(er) directories you still wish to keep
 around, but probably no longer immediately need for user support. Each of
 these directories are also created upon file archival if they do not exist.
 
-For example, `sarchive --cluster huppel -s /var/spool/slurm file --archive /var/backups/slurm/job-archive`
+For example, 
+
+`sarchive --cluster huppel -s /var/spool/slurm file --archive /var/backups/slurm/job-archive`
 
 ### Elasticsearch archival
 
@@ -70,13 +72,17 @@ and potentially other relevant information (at the scheduler's discretion).
 
 We do not yet support SSL/TLS or authentication with the ES backend.
 
-For example, `sarchive --cluster huppel -s /var/spool/slurm elasticsearch --host myelastic.mydomain --index slurm-job-archive`
+For example, 
+
+`sarchive --cluster huppel -s /var/spool/slurm elasticsearch --host myelastic.mydomain --index slurm-job-archive`
 
 ### Kafka archival
 
 Similar to ES archival, no SSL/TLS support at this moment. Data is shipped in the same manner.
 
-For example, `./sarchive --cluster huppel -l /var/log/sarchive.log -s /var/spool/slurm/ kafka --brokers mykafka.mydomain:9092 --topic slurm-job-archival`
+For example, 
+
+`./sarchive --cluster huppel -l /var/log/sarchive.log -s /var/spool/slurm/ kafka --brokers mykafka.mydomain:9092 --topic slurm-job-archival`
 
 ## Features
 
