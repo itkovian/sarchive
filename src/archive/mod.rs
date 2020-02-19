@@ -102,9 +102,10 @@ pub fn process(
                 if let Ok(mut job_entry) = entry {
                     // Simulate the debounced event we had before. Wait two seconds after dir creation event to
                     // have some assurance the files will have been written.
-                    if job_entry.moment().elapsed().as_secs() < 2 {
+                    let elapsed = job_entry.moment().elapsed();
+                    if elapsed.as_millis() < 2000 {
                         debug!("Waiting for time to elapse before checking files");
-                        sleep(Duration::from_millis(2000) - job_entry.moment().elapsed());
+                        sleep(Duration::from_millis(2000) - elapsed);
                     }
                     job_entry.read_job_info()?;
                     archiver.archive(&job_entry)?;
