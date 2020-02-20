@@ -27,7 +27,7 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use log::*;
 use notify::event::Event;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::path::Path;
 
 use super::scheduler::job::JobInfo;
@@ -41,15 +41,22 @@ fn check_and_queue(
     scheduler: &Box<dyn Scheduler>,
     s: &Sender<Box<dyn JobInfo>>,
     event: Event,
-) -> Result<(), Error> {
+) -> Result<(), std::io::Error> {
     debug!("Event received: {:?}", event);
-    if let Some(paths) = scheduler.verify_event_kind(&event) {
-        if let Some(jobinfo) = scheduler.create_job_info(&paths[0]) {
-            debug!("Sending jobinfo");
-            s.send(jobinfo).unwrap();
-        }
+
+    match scheduler.verify_event_kind(&event) {
+        Some(paths) => scheduler
+            .create_job_info(&paths[0])
+            .ok_or(Error::new(
+                ErrorKind::Other,
+                "Could not create job info structure".to_owned(),
+            ))
+            .and_then(|jobinfo| {
+                s.send(jobinfo)
+                    .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))
+            }),
+        _ => Ok(()),
     }
-    Ok(())
 }
 
 /// The monitor function uses a platform-specific watcher to track inotify events on
