@@ -27,26 +27,26 @@ If you do not have [Rust](https://rustlang.org), please see
 
 ## Usage
 
-`sarchive` requires that the paths to the scheduler's main spool directory is
-specified. It also requires a `cluster` (the cluster name) to be set.
+`sarchive` requires that the path to the scheduler's main spool directory is
+specified. It also requires a `cluster` (name) to be set.
 
-`sarchive` supports multiple schedulers, the one to use should also be specified
+`sarchive` supports multiple schedulers, the one to be used must be specified
 on the command line. Right now, there is support for [Slurm](https://slurm.schedmd.com)
 and [Torque](https://adaptivecomputing.com).
 
-For Slurm, the directory to watch is the `
+For Slurm, the directory to watch is defined as the `StateSaveLocation` in the slurm config.
 
-Furthermore, `sarchive` offers various backends. The basic backend writes a
-copy of the job scripts and associated files to a directory on a mounted
-filesystem. We also have limited support for sending job information to
-[Elasticsearch](https://elastic.co) or produce to a
+Furthermore, `sarchive` offers various backends. The basic `file` backend
+writes a copy of the job scripts and associated files to a directory on a 
+mounted filesystem. We also have limited support for sending job information 
+to [Elasticsearch](https://elastic.co) or produce to a
 [Kafka](https://kafka.apache.org) topic. We briefly discuss these backends
 below.
 
 ### File archival
 
-Activated using the `file` subcommand. Note that we do not support multiple
-subcommands at this moment.
+Activated using the `file` subcommand. Note that we do not support using
+multiple subcommands (i.e., backends) at this moment.
 
 For file archival, `sarchive` requires the path to the archive's top
 directory, i.e., where you want to store the backup scripts and accompanying
@@ -56,9 +56,9 @@ The archive can be further divided into subdirectories per
   - year: YYYY, by provinding `--period=yearly`
   - month: YYYYMM, by providing `--period=monthly`
   - day: YYYYMMDD, by providing `--period=daily`
-This allows for easily tarring old(er) directories you still wish to keep
-around, but probably no longer immediately need for user support. Each of
-these directories are also created upon file archival if they do not exist.
+Each of these directories are also created upon file archival if they do 
+not exist. This allows for easily tarring old(er) directories you still 
+wish to keep around, but probably no longer immediately need for user support. 
 
 For example, 
 
@@ -67,7 +67,7 @@ For example,
 ### Elasticsearch archival
 
 If you want to maintain the job script archive on another machine and/or make it easily searchable,
-the Elasticsearch backend. The shipped data structure contains a timestamp along with the job script
+use the Elasticsearch backend. The shipped data structure contains a timestamp along with the job script
 and potentially other relevant information (at the scheduler's discretion).
 
 We do not yet support SSL/TLS or authentication with the ES backend.
