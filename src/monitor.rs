@@ -84,20 +84,19 @@ pub fn monitor(
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {
-                return Ok(());
+                break Ok(());
             },
             recv(rx) -> event => {
-                if let Ok(Ok(e)) = event {
-                    check_and_queue(&scheduler, s, e)?
-                } else {
-                    error!("Error on received event: {:?}", event);
-                    break;
+                match event {
+                    Ok(Ok(e)) => check_and_queue(&scheduler, s, e)?,
+                    Ok(Err(_)) | Err(_) => {
+                        error!("Error on received event: {:?}", event);
+                        break Err(notify::Error::new(notify::ErrorKind::Generic("Problem receiving event".to_string())));
+                    }
                 }
             }
         }
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
