@@ -47,7 +47,7 @@ fn check_and_queue(
     match scheduler.verify_event_kind(&event) {
         Some(paths) => scheduler
             .create_job_info(&paths[0])
-            .ok_or(Error::new(
+            .ok_or_else(|| Error::new(
                 ErrorKind::Other,
                 "Could not create job info structure".to_owned(),
             ))
