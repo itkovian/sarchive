@@ -6,6 +6,7 @@ SArchive
 [![Actions Status](https://github.com/itkovian/sarchive/workflows/sarchive%20tests/badge.svg)](https://github.com/itkovian/sarchive/actions)
 [![Coverage Status](https://coveralls.io/repos/github/itkovian/sarchive/badge.svg)](https://coveralls.io/github/itkovian/sarchive)
 [![License](https://img.shields.io/github/license/itkovian/sarchive)](https://opensource.org/licenses/MIT)
+[![LoC](https://tokei.rs/b1/github/itkovian/sarchive?category=lines)](https://github.com/XAMPPRocky/tokei).
 
 
 Archival tool for scheduler job scripts and accompanying files.
