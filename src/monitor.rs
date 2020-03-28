@@ -47,10 +47,12 @@ fn check_and_queue(
     match scheduler.verify_event_kind(&event) {
         Some(paths) => scheduler
             .create_job_info(&paths[0])
-            .ok_or_else(|| Error::new(
-                ErrorKind::Other,
-                "Could not create job info structure".to_owned(),
-            ))
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::Other,
+                    "Could not create job info structure".to_owned(),
+                )
+            })
             .and_then(|jobinfo| {
                 s.send(jobinfo)
                     .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))
