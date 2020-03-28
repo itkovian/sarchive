@@ -29,7 +29,7 @@ pub mod kafka;
 
 use clap::ArgMatches;
 use crossbeam_channel::{select, Receiver};
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::io::{Error, ErrorKind};
 
 #[cfg(feature = "elasticsearch-7")]
@@ -105,7 +105,11 @@ pub fn process(
                     let elapsed = job_entry.moment().elapsed();
                     if elapsed.as_millis() < 2000 {
                         debug!("Waiting for time to elapse before checking files");
-                        sleep(Duration::from_millis(2000) - elapsed);
+                        if let Some(dur) = Duration::from_millis(2000).checked_sub(elapsed) {
+                            sleep(dur);
+                        } else {
+                            warn!("Time elapse check failed: expect less than 2000 millis, got {}", elapsed.as_millis());
+                        }
                     }
                     job_entry.read_job_info()?;
                     archiver.archive(&job_entry)?;
