@@ -24,6 +24,7 @@ use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{App, Arg, ArgMatches, SubCommand};
+use itertools::Itertools;
 use log::{debug, info};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{BaseRecord, DefaultProducerContext, ThreadedProducer};
@@ -50,11 +51,34 @@ pub fn clap_subcommand(command: &str) -> App {
                 .help("Topic under which to send messages to Kafka"),
         )
         .arg(
-            Arg::with_name("message_timeout")
+            Arg::with_name("message.timeout")
                 .long("message.timeout")
                 .takes_value(true)
                 .default_value("5000")
                 .help("Message timout in ms"),
+        )
+        .arg(
+            Arg::with_name("security.protocol")
+                .long("security.protocol")
+                .takes_value(true)
+                .default_value("plaintext")
+                .possible_value("plaintext")
+                .possible_value("ssl")
+                .possible_value("sasl_plaintext")
+                .possible_value("sasl_ssl")
+                .help("Protocol used to communicate with Kafka"),
+        )
+        .arg(
+            Arg::with_name("ssl")
+                .long("ssl")
+                .takes_value(true)
+                .help("Comma separated list of librdkafka ssl options"),
+        )
+        .arg(
+            Arg::with_name("sasl")
+                .long("sasl")
+                .takes_value(true)
+                .help("Comma separated list of librdkafka sasl options"),
         )
 }
 
@@ -64,13 +88,32 @@ pub struct KafkaArchive {
 }
 
 impl KafkaArchive {
-    pub fn new(brokers: &str, topic: &str, message_timeout: &str) -> Self {
+    pub fn new(
+        brokers: &str,
+        topic: &str,
+        message_timeout: &str,
+        ssl: &Option<Vec<(&str, &str)>>,
+        sasl: &Option<Vec<(&str, &str)>>,
+    ) -> Self {
+        let mut p = ClientConfig::new()
+            .set("bootstrap.servers", brokers)
+            .set("message.timeout.ms", message_timeout)
+            .to_owned();
+
+        if let Some(ssl) = ssl {
+            for (k, v) in ssl.into_iter() {
+                p.set(k, v);
+            }
+        }
+
+        if let Some(sasl) = sasl {
+            for (k, v) in sasl.into_iter() {
+                p.set(k, v);
+            }
+        }
+
         KafkaArchive {
-            producer: ClientConfig::new()
-                .set("bootstrap.servers", brokers)
-                .set("message.timeout.ms", message_timeout)
-                .create()
-                .expect("Cannot create Kafka producer. Aborting."),
+            producer: p.create().expect("Cannot create Kafka producer. Aborting."),
             topic: topic.to_owned(),
         }
     }
@@ -81,10 +124,28 @@ impl KafkaArchive {
             matches.value_of("brokers").unwrap(),
             matches.value_of("topic").unwrap()
         );
+
+        let ssl = matches.value_of("ssl").map(|ssl| {
+            ssl.split(",")
+                .map(|s| s.split("="))
+                .flatten()
+                .tuples()
+                .collect()
+        });
+        let sasl = matches.value_of("sasl").map(|sasl| {
+            sasl.split(",")
+                .map(|s| s.split("="))
+                .flatten()
+                .tuples()
+                .collect()
+        });
+
         Ok(KafkaArchive::new(
             matches.value_of("brokers").unwrap(),
             matches.value_of("topic").unwrap(),
             matches.value_of("message_timeout").unwrap(),
+            &ssl,
+            &sasl,
         ))
     }
 }
