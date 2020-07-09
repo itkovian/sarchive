@@ -146,7 +146,7 @@ impl KafkaArchive {
         Ok(KafkaArchive::new(
             matches.value_of("brokers").unwrap(),
             matches.value_of("topic").unwrap(),
-            matches.value_of("message_timeout").unwrap(),
+            matches.value_of("message.timeout").unwrap(),
             &ssl,
             &sasl,
         ))
