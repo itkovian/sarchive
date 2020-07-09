@@ -91,12 +91,14 @@ impl KafkaArchive {
         brokers: &str,
         topic: &str,
         message_timeout: &str,
+        security_protocol: &str,
         ssl: &Option<Vec<(&str, &str)>>,
         sasl: &Option<Vec<(&str, &str)>>,
     ) -> Self {
         let mut p = ClientConfig::new()
             .set("bootstrap.servers", brokers)
             .set("message.timeout.ms", message_timeout)
+            .set("security.protocol", security_protocol)
             .to_owned();
 
         if let Some(ssl) = ssl {
@@ -148,6 +150,7 @@ impl KafkaArchive {
             matches.value_of("brokers").unwrap(),
             matches.value_of("topic").unwrap(),
             matches.value_of("message.timeout").unwrap(),
+            matches.value_of("security.protocol").unwrap(),
             &ssl,
             &sasl,
         ))
