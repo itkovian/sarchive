@@ -17,7 +17,7 @@ that have not yet released a version with the features we use.
 
 ## Minimum supported `rustc`
 
-`1.36`
+`1.44`
 
 This version is what we test against in CI. We also test on
   - stable
@@ -38,8 +38,8 @@ and [Torque](https://adaptivecomputing.com).
 For Slurm, the directory to watch is defined as the `StateSaveLocation` in the slurm config.
 
 Furthermore, `sarchive` offers various backends. The basic `file` backend
-writes a copy of the job scripts and associated files to a directory on a 
-mounted filesystem. We also have limited support for sending job information 
+writes a copy of the job scripts and associated files to a directory on a
+mounted filesystem. We also have limited support for sending job information
 to [Elasticsearch](https://elastic.co) or produce to a
 [Kafka](https://kafka.apache.org) topic. We briefly discuss these backends
 below.
@@ -57,11 +57,11 @@ The archive can be further divided into subdirectories per
   - year: YYYY, by provinding `--period=yearly`
   - month: YYYYMM, by providing `--period=monthly`
   - day: YYYYMMDD, by providing `--period=daily`
-Each of these directories are also created upon file archival if they do 
-not exist. This allows for easily tarring old(er) directories you still 
-wish to keep around, but probably no longer immediately need for user support. 
+Each of these directories are also created upon file archival if they do
+not exist. This allows for easily tarring old(er) directories you still
+wish to keep around, but probably no longer immediately need for user support.
 
-For example, 
+For example,
 
 `sarchive --cluster huppel -s /var/spool/slurm file --archive /var/backups/slurm/job-archive`
 
@@ -73,7 +73,7 @@ and potentially other relevant information (at the scheduler's discretion).
 
 We do not yet support SSL/TLS or authentication with the ES backend.
 
-For example, 
+For example,
 
 `sarchive --cluster huppel -s /var/spool/slurm elasticsearch --host myelastic.mydomain --index slurm-job-archive`
 
@@ -81,7 +81,7 @@ For example,
 
 Similar to ES archival, no SSL/TLS support at this moment. Data is shipped in the same manner.
 
-For example, 
+For example,
 
 `./sarchive --cluster huppel -l /var/log/sarchive.log -s /var/spool/slurm/ kafka --brokers mykafka.mydomain:9092 --topic slurm-job-archival`
 

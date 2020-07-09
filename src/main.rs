@@ -20,7 +20,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-use chrono;
 use clap::{App, Arg, ArgMatches};
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;

@@ -29,7 +29,6 @@ use log::{debug, info};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{BaseRecord, DefaultProducerContext, ThreadedProducer};
 use serde::{Deserialize, Serialize};
-use serde_json;
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 
@@ -101,13 +100,13 @@ impl KafkaArchive {
             .to_owned();
 
         if let Some(ssl) = ssl {
-            for (k, v) in ssl.into_iter() {
+            for (k, v) in ssl.iter() {
                 p.set(k, v);
             }
         }
 
         if let Some(sasl) = sasl {
-            for (k, v) in sasl.into_iter() {
+            for (k, v) in sasl.iter() {
                 p.set(k, v);
             }
         }
@@ -126,15 +125,15 @@ impl KafkaArchive {
         );
 
         let ssl = matches.value_of("ssl").map(|ssl| {
-            ssl.split(",")
-                .map(|s| s.split("="))
+            ssl.split(',')
+                .map(|s| s.split('='))
                 .flatten()
                 .tuples()
                 .collect()
         });
         let sasl = matches.value_of("sasl").map(|sasl| {
-            sasl.split(",")
-                .map(|s| s.split("="))
+            sasl.split(',')
+                .map(|s| s.split('='))
                 .flatten()
                 .tuples()
                 .collect()
