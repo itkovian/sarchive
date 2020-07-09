@@ -119,9 +119,10 @@ impl KafkaArchive {
 
     pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
         info!(
-            "Using Kafka archival, talking to {} on topic {}",
+            "Using Kafka archival, talking to {} on topic {} using protocol {}",
             matches.value_of("brokers").unwrap(),
-            matches.value_of("topic").unwrap()
+            matches.value_of("topic").unwrap(),
+            matches.value_of("security.protocol").unwrap()
         );
 
         let ssl = matches.value_of("ssl").map(|ssl| {
@@ -138,6 +139,9 @@ impl KafkaArchive {
                 .tuples()
                 .collect()
         });
+
+        debug!("Using ssl options {:?}", ssl);
+        debug!("Using sasl options {:?}", sasl);
 
         Ok(KafkaArchive::new(
             matches.value_of("brokers").unwrap(),
