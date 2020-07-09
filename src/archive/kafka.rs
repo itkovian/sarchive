@@ -60,11 +60,11 @@ pub fn clap_subcommand(command: &str) -> App {
             Arg::with_name("security.protocol")
                 .long("security.protocol")
                 .takes_value(true)
-                .default_value("plaintext")
-                .possible_value("plaintext")
-                .possible_value("ssl")
-                .possible_value("sasl_plaintext")
-                .possible_value("sasl_ssl")
+                .default_value("PLAINTEXT")
+                .possible_value("PLAINTEXT")
+                .possible_value("SSL")
+                .possible_value("SASL_PLAINTEXT")
+                .possible_value("SASL_SSL")
                 .help("Protocol used to communicate with Kafka"),
         )
         .arg(
@@ -101,6 +101,7 @@ impl KafkaArchive {
 
         if let Some(ssl) = ssl {
             for (k, v) in ssl.iter() {
+                debug!("Setting kafka ssl property {} with value {}", k, v);
                 p.set(k, v);
             }
         }
