@@ -74,6 +74,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           override: true
+      - run: sudo apt-get install libsasl2-dev  libsasl2-2
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
