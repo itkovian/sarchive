@@ -79,11 +79,14 @@ For example,
 
 ### Kafka archival
 
-Similar to ES archival, no SSL/TLS support at this moment. Data is shipped in the same manner.
+You can ship the job scripts as messages to Kafka.
 
 For example,
 
 `./sarchive --cluster huppel -l /var/log/sarchive.log -s /var/spool/slurm/ kafka --brokers mykafka.mydomain:9092 --topic slurm-job-archival`
+
+Support for SSL and SASL is available, through the `--ssl` and `--sasl` options. Both of these expect a comma-separated
+list of options to pass to the underlying kafka library.
 
 ## Features
 
