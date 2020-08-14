@@ -76,7 +76,7 @@ fn setup_logging(debug: bool, logfile: Option<&str>) -> Result<(), log::SetLogge
     .apply()
 }
 
-fn args<'a>() -> ArgMatches<'a> {
+fn args() -> ArgMatches {
     let matches = App::new("SArchive")
         .version(VERSION)
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
@@ -84,29 +84,29 @@ fn args<'a>() -> ArgMatches<'a> {
         .arg(
             Arg::with_name("cluster")
                 .long("cluster")
-                .short("c")
+                .short('c')
                 .takes_value(true)
                 .required(true)
-                .help("Name of the cluster where the jobs have been submitted to."),
+                .about("Name of the cluster where the jobs have been submitted to."),
         )
         .arg(
             Arg::with_name("debug")
                 .long("debug")
-                .help("Log at DEBUG level.")
+                .about("Log at DEBUG level.")
         )
         .arg(
             Arg::with_name("cleanup")
                 .long("cleanup")
-                .help(
+                .about(
                     "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
                 )
         )
         .arg(
             Arg::with_name("logfile")
                 .long("logfile")
-                .short("l")
+                .short('l')
                 .takes_value(true)
-                .help("Log file name.")
+                .about("Log file name.")
         )
         .arg(
             Arg::with_name("scheduler")
@@ -114,18 +114,18 @@ fn args<'a>() -> ArgMatches<'a> {
                 .takes_value(true)
                 .default_value("slurm")
                 .possible_values(&["slurm", "torque"])
-                .help("Supported schedulers")
+                .about("Supported schedulers")
         )
         .arg(Arg::with_name("torque-subdirs ")
             .long("torque-subdirs")
-            .help("Monitor the subdirs 0...9 in the torque spool directory")
+            .about("Monitor the subdirs 0...9 in the torque spool directory")
         )
         .arg(
             Arg::with_name("spool")
                 .long("spool")
-                .short("s")
+                .short('s')
                 .takes_value(true)
-                .help(
+                .about(
                     "Location of the Torque job spool (where the job scripts and XML files are kept).",
                 )
         )

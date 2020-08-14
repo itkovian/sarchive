@@ -23,7 +23,7 @@ SOFTWARE.
 use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use elastic_derive::ElasticType;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
@@ -34,7 +34,7 @@ use std::process::exit;
 
 /// Command line options for the elastic archiver subcommand
 pub fn clap_subcommand(command: &str) -> App {
-    SubCommand::with_name(command)
+    App::new(command)
         .about("Archive to ElasticSearch")
         /*.arg(
             Arg::with_name("auth")
@@ -44,21 +44,21 @@ pub fn clap_subcommand(command: &str) -> App {
                 .long("host")
                 .takes_value(true)
                 .default_value("localhost")
-                .help("The hostname of the ElasticSearch server"),
+                .about("The hostname of the ElasticSearch server"),
         )
         .arg(
             Arg::with_name("port")
                 .long("port")
                 .takes_value(true)
                 .default_value("9200")
-                .help("The port of the ElasticSearch service"),
+                .about("The port of the ElasticSearch service"),
         )
         .arg(
             Arg::with_name("index")
                 .long("index")
                 .takes_value(true)
                 .required(true)
-                .help("The index where the documents will be put"),
+                .about("The index where the documents will be put"),
         )
 }
 //use elastic::http::header::{self, AUTHORIZATION, HeaderValue};

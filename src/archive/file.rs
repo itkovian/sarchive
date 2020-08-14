@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use log::{debug, error, warn};
 use std::fs::{create_dir_all, File};
 use std::io::{Error, Write};
@@ -30,24 +30,24 @@ use crate::scheduler::job::JobInfo;
 
 /// Command line options for the file archiver subcommand
 pub fn clap_subcommand(command: &str) -> App {
-    SubCommand::with_name(command)
+    App::new(command)
         .about("Archive to the filesystem")
         .arg(
             Arg::with_name("archive")
                 .long("archive")
-                .short("a")
+                .short('a')
                 .takes_value(true)
-                .help("Location of the job scripts' archive."),
+                .about("Location of the job scripts' archive."),
         )
         .arg(
             Arg::with_name("period")
                 .long("period")
-                .short("p")
+                .short('p')
                 .takes_value(true)
                 .possible_value("yearly")
                 .possible_value("monthly")
                 .possible_value("daily")
-                .help(
+                .about(
                     "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
                 )
         )
