@@ -6,11 +6,11 @@ updates:
     directory: "/"
     schedule:
         interval: "weekly"
-    target-branch: "production"
+    target-branch: "develop"
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
         # Check for updates to GitHub Actions every weekday
         interval: "daily"
-    target-branch: "production"
+    target-branch: "develop"
