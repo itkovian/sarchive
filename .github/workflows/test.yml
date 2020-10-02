@@ -7,12 +7,12 @@ jobs:
       matrix:
         rust:
           - stable
-          - 1.36.0
+          - 1.44.0
       fail-fast: false
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2.3.3
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -32,12 +32,12 @@ jobs:
       matrix:
         rust:
           - stable
-          - 1.36.0
+          - 1.44.0
       fail-fast: false
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2.3.3
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -58,7 +58,7 @@ jobs:
         rust:
           - stable
           - nightly
-          - 1.36.0
+          - 1.44.0
         features:
           - --features elasticsearch-7
           - --features kafka
@@ -68,12 +68,13 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v1
+        uses: actions/checkout@v2.3.3
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
           override: true
+      - run: sudo apt-get install libsasl2-dev  libsasl2-2
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
