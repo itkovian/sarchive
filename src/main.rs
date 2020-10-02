@@ -82,7 +82,7 @@ fn args() -> ArgMatches {
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
         .arg(
-            Arg::with_name("cluster")
+            Arg::new("cluster")
                 .long("cluster")
                 .short('c')
                 .takes_value(true)
@@ -90,38 +90,38 @@ fn args() -> ArgMatches {
                 .about("Name of the cluster where the jobs have been submitted to."),
         )
         .arg(
-            Arg::with_name("debug")
+            Arg::new("debug")
                 .long("debug")
                 .about("Log at DEBUG level.")
         )
         .arg(
-            Arg::with_name("cleanup")
+            Arg::new("cleanup")
                 .long("cleanup")
                 .about(
                     "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
                 )
         )
         .arg(
-            Arg::with_name("logfile")
+            Arg::new("logfile")
                 .long("logfile")
                 .short('l')
                 .takes_value(true)
                 .about("Log file name.")
         )
         .arg(
-            Arg::with_name("scheduler")
+            Arg::new("scheduler")
                 .long("scheduler")
                 .takes_value(true)
                 .default_value("slurm")
                 .possible_values(&["slurm", "torque"])
                 .about("Supported schedulers")
         )
-        .arg(Arg::with_name("torque-subdirs ")
+        .arg(Arg::new("torque-subdirs ")
             .long("torque-subdirs")
             .about("Monitor the subdirs 0...9 in the torque spool directory")
         )
         .arg(
-            Arg::with_name("spool")
+            Arg::new("spool")
                 .long("spool")
                 .short('s')
                 .takes_value(true)

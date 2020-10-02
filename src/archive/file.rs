@@ -33,14 +33,14 @@ pub fn clap_subcommand(command: &str) -> App {
     App::new(command)
         .about("Archive to the filesystem")
         .arg(
-            Arg::with_name("archive")
+            Arg::new("archive")
                 .long("archive")
                 .short('a')
                 .takes_value(true)
                 .about("Location of the job scripts' archive."),
         )
         .arg(
-            Arg::with_name("period")
+            Arg::new("period")
                 .long("period")
                 .short('p')
                 .takes_value(true)

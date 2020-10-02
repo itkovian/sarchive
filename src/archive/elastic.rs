@@ -40,21 +40,21 @@ pub fn clap_subcommand(command: &str) -> App {
             Arg::with_name("auth")
         )*/
         .arg(
-            Arg::with_name("host")
+            Arg::new("host")
                 .long("host")
                 .takes_value(true)
                 .default_value("localhost")
                 .about("The hostname of the ElasticSearch server"),
         )
         .arg(
-            Arg::with_name("port")
+            Arg::new("port")
                 .long("port")
                 .takes_value(true)
                 .default_value("9200")
                 .about("The port of the ElasticSearch service"),
         )
         .arg(
-            Arg::with_name("index")
+            Arg::new("index")
                 .long("index")
                 .takes_value(true)
                 .required(true)
