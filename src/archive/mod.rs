@@ -49,21 +49,21 @@ pub trait Archive: Send {
 
 pub fn archive_builder(matches: &ArgMatches) -> Result<Box<dyn Archive>, Error> {
     match matches.subcommand() {
-        ("file", Some(command_matches)) => {
+        Some(("file", command_matches)) => {
             let archive = FileArchive::build(command_matches)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "elasticsearch-7")]
-        ("elasticsearch", Some(run_matches)) => {
+        Some(("elasticsearch", run_matches)) => {
             let archive = ElasticArchive::build(run_matches)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "kafka")]
-        ("kafka", Some(run_matches)) => {
+        Some(("kafka", run_matches)) => {
             let archive = KafkaArchive::build(run_matches)?;
             Ok(Box::new(archive))
         }
-        (&_, _) => Err(Error::new(
+        _ => Err(Error::new(
             ErrorKind::Other,
             "No supported archival subcommand used",
         )),
