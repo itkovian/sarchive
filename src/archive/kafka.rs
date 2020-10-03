@@ -23,7 +23,7 @@ SOFTWARE.
 use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use itertools::Itertools;
 use log::{debug, info};
 use rdkafka::config::ClientConfig;
@@ -33,31 +33,31 @@ use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 
 pub fn clap_subcommand(command: &str) -> App {
-    SubCommand::with_name(command)
+    App::new(command)
         .about("Archive to Kafka")
         .arg(
-            Arg::with_name("brokers")
+            Arg::new("brokers")
                 .long("brokers")
                 .takes_value(true)
                 .default_value("localhost:9092")
-                .help("Comma-separated list of brokers"),
+                .about("Comma-separated list of brokers"),
         )
         .arg(
-            Arg::with_name("topic")
+            Arg::new("topic")
                 .long("topic")
                 .takes_value(true)
                 .default_value("sarchive")
-                .help("Topic under which to send messages to Kafka"),
+                .about("Topic under which to send messages to Kafka"),
         )
         .arg(
-            Arg::with_name("message.timeout")
+            Arg::new("message.timeout")
                 .long("message.timeout")
                 .takes_value(true)
                 .default_value("5000")
-                .help("Message timout in ms"),
+                .about("Message timout in ms"),
         )
         .arg(
-            Arg::with_name("security.protocol")
+            Arg::new("security.protocol")
                 .long("security.protocol")
                 .takes_value(true)
                 .default_value("PLAINTEXT")
@@ -65,19 +65,19 @@ pub fn clap_subcommand(command: &str) -> App {
                 .possible_value("SSL")
                 .possible_value("SASL_PLAINTEXT")
                 .possible_value("SASL_SSL")
-                .help("Protocol used to communicate with Kafka"),
+                .about("Protocol used to communicate with Kafka"),
         )
         .arg(
-            Arg::with_name("ssl")
+            Arg::new("ssl")
                 .long("ssl")
                 .takes_value(true)
-                .help("Comma separated list of librdkafka ssl options"),
+                .about("Comma separated list of librdkafka ssl options"),
         )
         .arg(
-            Arg::with_name("sasl")
+            Arg::new("sasl")
                 .long("sasl")
                 .takes_value(true)
-                .help("Comma separated list of librdkafka sasl options"),
+                .about("Comma separated list of librdkafka sasl options"),
         )
 }
 
