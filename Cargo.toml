@@ -29,7 +29,7 @@ notify = "5.0.0-pre.2"
 libc = "0.2.68"
 log = "0.4"
 reopen = "1.0.1"
-signal-hook = "0.1.13"
+signal-hook = "0.2.0"
 
 elastic = { version = "~0.21.0-pre.5", optional = true }
 elastic_derive = { version = "~0.21.0-pre.5", optional = true }
