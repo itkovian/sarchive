@@ -37,7 +37,7 @@ serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_derive = { version = "^1.0", optional = true }
 serde_json = { version = "^1.0", optional = true }
 rdkafka = { version = "0.24.0", optional = true, features = ["ssl", "sasl"]}
-itertools = "0.9.0"
+itertools = "0.10.0"
 
 [lib]
 name = "sarchive"
