@@ -12,12 +12,13 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2.3.3
+        uses: actions/checkout@v2.3.4
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
           override: true
+      - run: sudo apt-get install libsasl2-dev  libsasl2-2
       - name: Install clippy
         run: rustup component add clippy
       - name: Run cargo clippy
@@ -37,7 +38,7 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2.3.3
+        uses: actions/checkout@v2.3.4
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -68,7 +69,7 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2.3.3
+        uses: actions/checkout@v2.3.4
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:

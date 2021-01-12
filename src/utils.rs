@@ -73,7 +73,7 @@ pub fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &
     let u1 = unparker.clone();
     let n1 = Arc::clone(&notification);
     unsafe {
-        if let Err(e) = signal_hook::register(signal, move || {
+        if let Err(e) = signal_hook::low_level::register(signal, move || {
             info!("Received signal {}", signal);
             n1.store(true, SeqCst);
             u1.unpark()

@@ -76,56 +76,56 @@ fn setup_logging(debug: bool, logfile: Option<&str>) -> Result<(), log::SetLogge
     .apply()
 }
 
-fn args<'a>() -> ArgMatches<'a> {
+fn args() -> ArgMatches {
     let matches = App::new("SArchive")
         .version(VERSION)
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
         .arg(
-            Arg::with_name("cluster")
+            Arg::new("cluster")
                 .long("cluster")
-                .short("c")
+                .short('c')
                 .takes_value(true)
                 .required(true)
-                .help("Name of the cluster where the jobs have been submitted to."),
+                .about("Name of the cluster where the jobs have been submitted to."),
         )
         .arg(
-            Arg::with_name("debug")
+            Arg::new("debug")
                 .long("debug")
-                .help("Log at DEBUG level.")
+                .about("Log at DEBUG level.")
         )
         .arg(
-            Arg::with_name("cleanup")
+            Arg::new("cleanup")
                 .long("cleanup")
-                .help(
+                .about(
                     "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
                 )
         )
         .arg(
-            Arg::with_name("logfile")
+            Arg::new("logfile")
                 .long("logfile")
-                .short("l")
+                .short('l')
                 .takes_value(true)
-                .help("Log file name.")
+                .about("Log file name.")
         )
         .arg(
-            Arg::with_name("scheduler")
+            Arg::new("scheduler")
                 .long("scheduler")
                 .takes_value(true)
                 .default_value("slurm")
                 .possible_values(&["slurm", "torque"])
-                .help("Supported schedulers")
+                .about("Supported schedulers")
         )
-        .arg(Arg::with_name("torque-subdirs ")
+        .arg(Arg::new("torque-subdirs ")
             .long("torque-subdirs")
-            .help("Monitor the subdirs 0...9 in the torque spool directory")
+            .about("Monitor the subdirs 0...9 in the torque spool directory")
         )
         .arg(
-            Arg::with_name("spool")
+            Arg::new("spool")
                 .long("spool")
-                .short("s")
+                .short('s')
                 .takes_value(true)
-                .help(
+                .about(
                     "Location of the Torque job spool (where the job scripts and XML files are kept).",
                 )
         )
@@ -174,8 +174,8 @@ fn main() -> Result<(), std::io::Error> {
     let parker = Parker::new();
     let unparker = parker.unparker();
 
-    register_signal_handler(signal_hook::SIGTERM, &unparker, &notification);
-    register_signal_handler(signal_hook::SIGINT, &unparker, &notification);
+    register_signal_handler(signal_hook::consts::SIGTERM, &unparker, &notification);
+    register_signal_handler(signal_hook::consts::SIGINT, &unparker, &notification);
 
     let (sig_sender, sig_receiver) = bounded(20);
     let cleanup = matches.is_present("cleanup");
