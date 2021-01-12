@@ -330,7 +330,7 @@ mod tests {
             assert!(false);
         }
 
-        if let Some(hm) = slurm_job_entry.extra_info() {
+        if let Some(_hm) = slurm_job_entry.extra_info() {
         } else {
             assert!(false);
         }
