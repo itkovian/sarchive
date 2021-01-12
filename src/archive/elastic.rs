@@ -201,6 +201,4 @@ struct JobMessage {
 }
 
 #[cfg(test)]
-mod tests {
-
-}
+mod tests {}
