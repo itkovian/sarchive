@@ -69,7 +69,10 @@ pub struct ElasticArchive {
     //index: String,
 }
 
-fn create_index(client: &SyncClient, index_name: String) -> Result<elastic::prelude::CommandResponse, elastic::Error> {
+fn create_index(
+    client: &SyncClient,
+    index_name: String,
+) -> Result<elastic::prelude::CommandResponse, elastic::Error> {
     let body = json!({
         "mappings": {
             "dynamic": true,
@@ -125,7 +128,6 @@ fn create_index(client: &SyncClient, index_name: String) -> Result<elastic::prel
         .create()
         .body(body.to_string())
         .send()
-
 }
 
 impl ElasticArchive {
