@@ -87,7 +87,7 @@ impl JobInfo for TorqueJobEntry {
         let dir = self.path_.parent().unwrap();
         let filename = self.path_.strip_prefix(&dir).unwrap();
         self.jobname_ = Some(filename.to_str().unwrap().to_string());
-        self.script_ = Some(utils::read_file(&dir, &filename, None)?);
+        self.script_ = Some(utils::read_file(dir, filename, None)?);
 
         // check for the presence of a .TA file
         let ta_filename = filename.with_extension("TA");
@@ -109,7 +109,7 @@ impl JobInfo for TorqueJobEntry {
                     if let Ok(jb_path) = jb_path {
                         let jb_dir = jb_path.parent()?;
                         let jb_filename = jb_path.strip_prefix(&jb_dir).unwrap();
-                        let jb = utils::read_file(&jb_dir, &jb_filename, Some(10)).unwrap();
+                        let jb = utils::read_file(jb_dir, jb_filename, Some(10)).unwrap();
                         Some((jb_filename.to_owned(), jb))
                     } else {
                         None
@@ -151,7 +151,7 @@ impl JobInfo for TorqueJobEntry {
     // Return the actual job script as a String
     fn script(&self) -> String {
         match &self.script_ {
-            Some(s) => String::from_utf8_lossy(&s).to_string(),
+            Some(s) => String::from_utf8_lossy(s).to_string(),
             None => panic!("No script available for job {}", self.jobid_),
         }
     }
@@ -161,7 +161,7 @@ impl JobInfo for TorqueJobEntry {
         Some(
             self.env_
                 .iter()
-                .map(|(k, v)| (k.clone(), String::from_utf8_lossy(&v).to_string()))
+                .map(|(k, v)| (k.clone(), String::from_utf8_lossy(v).to_string()))
                 .collect(),
         )
     }
@@ -193,7 +193,7 @@ impl Scheduler for Torque {
     }
 
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
-        if let Some((jobid, filename)) = is_job_path(&event_path) {
+        if let Some((jobid, filename)) = is_job_path(event_path) {
             Some(Box::new(TorqueJobEntry::new(
                 &filename.to_path_buf(),
                 jobid,

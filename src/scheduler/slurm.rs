@@ -103,7 +103,7 @@ impl JobInfo for SlurmJobEntry {
     /// For Slurm, this encompasses the job script and the job environment
     fn read_job_info(&mut self) -> Result<(), Error> {
         self.script_ = {
-            let mut s = utils::read_file(&self.path_, &Path::new("script"), None)?;
+            let mut s = utils::read_file(&self.path_, Path::new("script"), None)?;
             if let Some(0) = s.last() {
                 s.pop();
             }
@@ -111,7 +111,7 @@ impl JobInfo for SlurmJobEntry {
         };
         self.env_ = Some(utils::read_file(
             &self.path_,
-            &Path::new("environment"),
+            Path::new("environment"),
             None,
         )?);
         Ok(())
@@ -223,7 +223,7 @@ impl Scheduler for Slurm {
     ///
     /// * event_path: A `Path to the job directory that
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
-        if let Some((jobid, _dirname)) = is_job_path(&event_path) {
+        if let Some((jobid, _dirname)) = is_job_path(event_path) {
             Some(Box::new(SlurmJobEntry::new(
                 &event_path.to_path_buf(),
                 jobid,
