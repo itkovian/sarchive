@@ -52,9 +52,9 @@ pub struct TorqueJobEntry {
 }
 
 impl TorqueJobEntry {
-    fn new(p: &PathBuf, id: &str, cluster: &str) -> TorqueJobEntry {
+    fn new(p: &Path, id: &str, cluster: &str) -> TorqueJobEntry {
         TorqueJobEntry {
-            path_: p.clone(),
+            path_: p.to_path_buf(),
             jobname_: None,
             cluster_: cluster.to_string(),
             jobid_: id.to_owned(),
@@ -173,9 +173,9 @@ pub struct Torque {
 }
 
 impl Torque {
-    pub fn new(base: &PathBuf, cluster: &str) -> Torque {
+    pub fn new(base: &Path, cluster: &str) -> Torque {
         Torque {
-            base: base.clone(),
+            base: base.to_path_buf(),
             cluster: cluster.to_string(),
         }
     }

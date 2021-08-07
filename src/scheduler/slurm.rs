@@ -70,9 +70,9 @@ impl SlurmJobEntry {
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
-    pub fn new(path: &PathBuf, id: &str, cluster: &str) -> SlurmJobEntry {
+    pub fn new(path: &Path, id: &str, cluster: &str) -> SlurmJobEntry {
         SlurmJobEntry {
-            path_: path.clone(),
+            path_: path.to_path_buf(),
             jobid_: id.to_string(),
             cluster_: cluster.to_string(),
             moment_: Instant::now(),
@@ -194,9 +194,9 @@ impl Slurm {
     ///
     /// assert_eq!(slurm.base, base);
     /// ```
-    pub fn new(base: &PathBuf, cluster: &str) -> Slurm {
+    pub fn new(base: &Path, cluster: &str) -> Slurm {
         Slurm {
-            base: base.clone(),
+            base: base.to_path_buf(),
             cluster: cluster.to_string(),
         }
     }

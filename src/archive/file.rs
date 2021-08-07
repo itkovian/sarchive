@@ -72,9 +72,9 @@ pub struct FileArchive {
 }
 
 impl FileArchive {
-    pub fn new(archive_path: &PathBuf, p: Period) -> Self {
+    pub fn new(archive_path: &Path, p: Period) -> Self {
         FileArchive {
-            archive_path: archive_path.clone(),
+            archive_path: archive_path.to_path_buf(),
             period: p,
         }
     }
