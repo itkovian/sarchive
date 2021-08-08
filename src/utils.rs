@@ -46,7 +46,7 @@ pub fn read_file(path: &Path, filename: &Path, iters: Option<u32>) -> Result<Vec
     while !Path::exists(&fpath) && iters > 0 {
         debug!("Waiting for {:?}", &fpath);
         sleep(ten_millis);
-        if !Path::exists(path) {
+        if !Path::exists(&path) {
             debug!("Job directory {:?} no longer exists", &path);
             return Err(Error::new(
                 ErrorKind::NotFound,
@@ -71,7 +71,7 @@ pub fn read_file(path: &Path, filename: &Path, iters: Option<u32>) -> Result<Vec
 pub fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
     info!("Registering signal handler for signal {}", signal);
     let u1 = unparker.clone();
-    let n1 = Arc::clone(notification);
+    let n1 = Arc::clone(&notification);
     unsafe {
         if let Err(e) = signal_hook::low_level::register(signal, move || {
             info!("Received signal {}", signal);

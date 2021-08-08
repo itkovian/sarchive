@@ -42,7 +42,7 @@ pub trait Scheduler: Send + Sync {
     fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>>;
 }
 
-pub fn create(kind: &SchedulerKind, spool_path: &Path, cluster: &str) -> Box<dyn Scheduler> {
+pub fn create(kind: &SchedulerKind, spool_path: &PathBuf, cluster: &str) -> Box<dyn Scheduler> {
     match kind {
         SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster)),
         SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path, cluster)),

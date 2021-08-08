@@ -174,8 +174,8 @@ fn main() -> Result<(), std::io::Error> {
     let parker = Parker::new();
     let unparker = parker.unparker();
 
-    register_signal_handler(signal_hook::consts::SIGTERM, unparker, &notification);
-    register_signal_handler(signal_hook::consts::SIGINT, unparker, &notification);
+    register_signal_handler(signal_hook::consts::SIGTERM, &unparker, &notification);
+    register_signal_handler(signal_hook::consts::SIGINT, &unparker, &notification);
 
     let (sig_sender, sig_receiver) = bounded(20);
     let cleanup = matches.is_present("cleanup");
