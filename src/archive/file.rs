@@ -72,9 +72,9 @@ pub struct FileArchive {
 }
 
 impl FileArchive {
-    pub fn new(archive_path: &PathBuf, p: Period) -> Self {
+    pub fn new(archive_path: &Path, p: Period) -> Self {
         FileArchive {
-            archive_path: archive_path.clone(),
+            archive_path: archive_path.to_path_buf(),
             period: p,
         }
     }
@@ -113,12 +113,12 @@ impl Archive for FileArchive {
     ///
     fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         let archive_path = &self.archive_path;
-        let target_path = determine_target_path(&archive_path, &self.period);
+        let target_path = determine_target_path(archive_path, &self.period);
         debug!("Target path: {:?}", target_path);
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
             let mut f = File::create(target_path.join(&fname))?;
-            f.write_all(&fcontents)?;
+            f.write_all(fcontents)?;
         }
         Ok(())
     }
