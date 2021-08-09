@@ -104,13 +104,13 @@ impl KafkaArchive {
         if let Some(ssl) = ssl {
             for (k, v) in ssl.iter() {
                 debug!("Setting kafka ssl property {} with value {}", k, v);
-                p.set(k, v);
+                p.set(*k, *v);
             }
         }
 
         if let Some(sasl) = sasl {
             for (k, v) in sasl.iter() {
-                p.set(k, v);
+                p.set(*k, *v);
             }
         }
 

@@ -14,7 +14,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2.3.4
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: ${{ matrix.rust }}
           override: true
@@ -22,7 +22,7 @@ jobs:
       - name: Install clippy
         run: rustup component add clippy
       - name: Run cargo clippy
-        uses: actions-rs/clippy-check@v1
+        uses: actions-rs/clippy-check@v1.0.7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features -- -D warnings
@@ -40,14 +40,14 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2.3.4
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: ${{ matrix.rust }}
           override: true
       - name: Install rustfmt
         run: rustup component add rustfmt
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
+        uses: actions-rs/cargo@v1.0.3
         with:
           command: fmt
           args: --all -- --check
@@ -71,13 +71,13 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v2.3.4
       - name: Install toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: ${{ matrix.rust }}
           override: true
       - run: sudo apt-get install libsasl2-dev  libsasl2-2
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
+        uses: actions-rs/cargo@v1.0.3
         with:
           command: test
           args: ${{ matrix.features }}

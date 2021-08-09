@@ -36,7 +36,7 @@ elastic_derive = { version = "~0.21.0-pre.5", optional = true }
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_derive = { version = "^1.0", optional = true }
 serde_json = { version = "^1.0", optional = true }
-rdkafka = { version = "0.24.0", optional = true, features = ["ssl", "sasl"]}
+rdkafka = { version = "0.26.0", optional = true, features = ["ssl", "sasl"]}
 itertools = "0.10.0"
 
 [lib]
