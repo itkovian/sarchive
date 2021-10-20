@@ -7,7 +7,7 @@ jobs:
       matrix:
         rust:
           - stable
-          - 1.48.0
+          - 1.55.0
       fail-fast: false
 
     steps:
@@ -33,7 +33,7 @@ jobs:
       matrix:
         rust:
           - stable
-          - 1.48.0
+          - 1.55.0
       fail-fast: false
 
     steps:
@@ -59,7 +59,7 @@ jobs:
         rust:
           - stable
           - nightly
-          - 1.48.0
+          - 1.55.0
         features:
           - --features elasticsearch-7
           - --features kafka
