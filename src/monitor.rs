@@ -26,7 +26,7 @@ extern crate crossbeam_utils;
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use log::*;
 use notify::event::Event;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
@@ -74,8 +74,8 @@ pub fn monitor(
 ) -> notify::Result<()> {
     let (tx, rx) = unbounded();
 
-    // create a platform-specific watcher
-    let mut watcher = RecommendedWatcher::new_immediate(move |res| tx.send(res).unwrap())?;
+    // create a platform-spectific watcher
+    let mut watcher = recommended_watcher(move |res| tx.send(res).unwrap())?;
 
     info!("Watching path {:?}", &path);
 
