@@ -29,7 +29,7 @@ pub mod kafka;
 
 use clap::ArgMatches;
 use crossbeam_channel::{select, Receiver};
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::io::{Error, ErrorKind};
 
 #[cfg(feature = "elasticsearch-7")]
@@ -49,21 +49,21 @@ pub trait Archive: Send {
 
 pub fn archive_builder(matches: &ArgMatches) -> Result<Box<dyn Archive>, Error> {
     match matches.subcommand() {
-        ("file", Some(command_matches)) => {
+        Some(("file", command_matches)) => {
             let archive = FileArchive::build(command_matches)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "elasticsearch-7")]
-        ("elasticsearch", Some(run_matches)) => {
+        Some(("elasticsearch", run_matches)) => {
             let archive = ElasticArchive::build(run_matches)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "kafka")]
-        ("kafka", Some(run_matches)) => {
+        Some(("kafka", run_matches)) => {
             let archive = KafkaArchive::build(run_matches)?;
             Ok(Box::new(archive))
         }
-        (&_, _) => Err(Error::new(
+        _ => Err(Error::new(
             ErrorKind::Other,
             "No supported archival subcommand used",
         )),
@@ -103,13 +103,9 @@ pub fn process(
                     // Simulate the debounced event we had before. Wait two seconds after dir creation event to
                     // have some assurance the files will have been written.
                     let elapsed = job_entry.moment().elapsed();
-                    if elapsed.as_millis() < 2000 {
-                        debug!("Waiting for time to elapse before checking files");
-                        if let Some(dur) = Duration::from_millis(2000).checked_sub(elapsed) {
-                            sleep(dur);
-                        } else {
-                            warn!("Time elapse check failed: expect less than 2000 millis, got {}", elapsed.as_millis());
-                        }
+                    if let Some(dur) = Duration::from_millis(2000).checked_sub(elapsed) {
+                        debug!("Waiting for {} ms to elapse before checking files", dur.as_millis());
+                        sleep(dur);
                     }
                     job_entry.read_job_info()?;
                     archiver.archive(&job_entry)?;
