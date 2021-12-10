@@ -70,9 +70,9 @@ impl SlurmJobEntry {
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
-    pub fn new(path: &PathBuf, id: &str, cluster: &str) -> SlurmJobEntry {
+    pub fn new(path: &Path, id: &str, cluster: &str) -> SlurmJobEntry {
         SlurmJobEntry {
-            path_: path.clone(),
+            path_: path.to_path_buf(),
             jobid_: id.to_string(),
             cluster_: cluster.to_string(),
             moment_: Instant::now(),
@@ -103,7 +103,7 @@ impl JobInfo for SlurmJobEntry {
     /// For Slurm, this encompasses the job script and the job environment
     fn read_job_info(&mut self) -> Result<(), Error> {
         self.script_ = {
-            let mut s = utils::read_file(&self.path_, &Path::new("script"), None)?;
+            let mut s = utils::read_file(&self.path_, Path::new("script"), None)?;
             if let Some(0) = s.last() {
                 s.pop();
             }
@@ -111,7 +111,7 @@ impl JobInfo for SlurmJobEntry {
         };
         self.env_ = Some(utils::read_file(
             &self.path_,
-            &Path::new("environment"),
+            Path::new("environment"),
             None,
         )?);
         Ok(())
@@ -194,9 +194,9 @@ impl Slurm {
     ///
     /// assert_eq!(slurm.base, base);
     /// ```
-    pub fn new(base: &PathBuf, cluster: &str) -> Slurm {
+    pub fn new(base: &Path, cluster: &str) -> Slurm {
         Slurm {
-            base: base.clone(),
+            base: base.to_path_buf(),
             cluster: cluster.to_string(),
         }
     }
@@ -223,7 +223,7 @@ impl Scheduler for Slurm {
     ///
     /// * event_path: A `Path to the job directory that
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
-        if let Some((jobid, _dirname)) = is_job_path(&event_path) {
+        if let Some((jobid, _dirname)) = is_job_path(event_path) {
             Some(Box::new(SlurmJobEntry::new(
                 &event_path.to_path_buf(),
                 jobid,
@@ -330,7 +330,7 @@ mod tests {
             assert!(false);
         }
 
-        if let Some(hm) = slurm_job_entry.extra_info() {
+        if let Some(_hm) = slurm_job_entry.extra_info() {
         } else {
             assert!(false);
         }

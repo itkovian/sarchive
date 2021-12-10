@@ -26,7 +26,7 @@ extern crate crossbeam_utils;
 use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use log::*;
 use notify::event::Event;
-use notify::{RecommendedWatcher, RecursiveMode, Watcher, recommended_watcher};
+use notify::{RecursiveMode, Watcher, recommended_watcher};
 use std::io::{Error, ErrorKind};
 use std::path::Path;
 
@@ -74,12 +74,12 @@ pub fn monitor(
 ) -> notify::Result<()> {
     let (tx, rx) = unbounded();
 
-    // create a platform-spectific watcher
+    // create a platform-specific watcher
     let mut watcher = recommended_watcher(move |res| tx.send(res).unwrap())?;
 
-    info!("Watching path {:?}", &path);
+    info!("Watching path {:?}", path);
 
-    if let Err(e) = watcher.watch(&path, RecursiveMode::NonRecursive) {
+    if let Err(e) = watcher.watch(path, RecursiveMode::NonRecursive) {
         return Err(e);
     }
     #[allow(clippy::zero_ptr, clippy::drop_copy)]
@@ -90,7 +90,7 @@ pub fn monitor(
             },
             recv(rx) -> event => {
                 match event {
-                    Ok(Ok(e)) => check_and_queue(&scheduler, s, e)?,
+                    Ok(Ok(e)) => check_and_queue(scheduler, s, e)?,
                     Ok(Err(_)) | Err(_) => {
                         error!("Error on received event: {:?}", event);
                         break Err(notify::Error::new(notify::ErrorKind::Generic("Problem receiving event".to_string())));

@@ -23,7 +23,7 @@ SOFTWARE.
 use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use elastic_derive::ElasticType;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
@@ -34,31 +34,31 @@ use std::process::exit;
 
 /// Command line options for the elastic archiver subcommand
 pub fn clap_subcommand(command: &str) -> App {
-    SubCommand::with_name(command)
+    App::new(command)
         .about("Archive to ElasticSearch")
         /*.arg(
             Arg::with_name("auth")
         )*/
         .arg(
-            Arg::with_name("host")
+            Arg::new("host")
                 .long("host")
                 .takes_value(true)
                 .default_value("localhost")
-                .help("The hostname of the ElasticSearch server"),
+                .about("The hostname of the ElasticSearch server"),
         )
         .arg(
-            Arg::with_name("port")
+            Arg::new("port")
                 .long("port")
                 .takes_value(true)
                 .default_value("9200")
-                .help("The port of the ElasticSearch service"),
+                .about("The port of the ElasticSearch service"),
         )
         .arg(
-            Arg::with_name("index")
+            Arg::new("index")
                 .long("index")
                 .takes_value(true)
                 .required(true)
-                .help("The index where the documents will be put"),
+                .about("The index where the documents will be put"),
         )
 }
 //use elastic::http::header::{self, AUTHORIZATION, HeaderValue};
@@ -69,7 +69,10 @@ pub struct ElasticArchive {
     //index: String,
 }
 
-fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
+fn create_index(
+    client: &SyncClient,
+    index_name: String,
+) -> Result<elastic::prelude::CommandResponse, elastic::Error> {
     let body = json!({
         "mappings": {
             "dynamic": true,
@@ -125,9 +128,6 @@ fn create_index(client: &SyncClient, index_name: String) -> Result<(), Error> {
         .create()
         .body(body.to_string())
         .send()
-        .unwrap();
-
-    Ok(())
 }
 
 impl ElasticArchive {
@@ -201,9 +201,4 @@ struct JobMessage {
 }
 
 #[cfg(test)]
-mod tests {
-
-    use super::*;
-    use std::env;
-    use std::path::PathBuf;
-}
+mod tests {}

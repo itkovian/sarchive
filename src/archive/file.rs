@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgMatches};
 use log::{debug, error, warn};
 use std::fs::{create_dir_all, File};
 use std::io::{Error, Write};
@@ -30,24 +30,24 @@ use crate::scheduler::job::JobInfo;
 
 /// Command line options for the file archiver subcommand
 pub fn clap_subcommand(command: &str) -> App {
-    SubCommand::with_name(command)
+    App::new(command)
         .about("Archive to the filesystem")
         .arg(
-            Arg::with_name("archive")
+            Arg::new("archive")
                 .long("archive")
-                .short("a")
+                .short('a')
                 .takes_value(true)
-                .help("Location of the job scripts' archive."),
+                .about("Location of the job scripts' archive."),
         )
         .arg(
-            Arg::with_name("period")
+            Arg::new("period")
                 .long("period")
-                .short("p")
+                .short('p')
                 .takes_value(true)
                 .possible_value("yearly")
                 .possible_value("monthly")
                 .possible_value("daily")
-                .help(
+                .about(
                     "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
                 )
         )
@@ -72,9 +72,9 @@ pub struct FileArchive {
 }
 
 impl FileArchive {
-    pub fn new(archive_path: &PathBuf, p: Period) -> Self {
+    pub fn new(archive_path: &Path, p: Period) -> Self {
         FileArchive {
-            archive_path: archive_path.clone(),
+            archive_path: archive_path.to_path_buf(),
             period: p,
         }
     }
@@ -113,12 +113,12 @@ impl Archive for FileArchive {
     ///
     fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         let archive_path = &self.archive_path;
-        let target_path = determine_target_path(&archive_path, &self.period);
+        let target_path = determine_target_path(archive_path, &self.period);
         debug!("Target path: {:?}", target_path);
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
             let mut f = File::create(target_path.join(&fname))?;
-            f.write_all(&fcontents)?;
+            f.write_all(fcontents)?;
         }
         Ok(())
     }
