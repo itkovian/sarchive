@@ -87,17 +87,17 @@ fn args() -> ArgMatches {
                 .short('c')
                 .takes_value(true)
                 .required(true)
-                .about("Name of the cluster where the jobs have been submitted to."),
+                .help("Name of the cluster where the jobs have been submitted to."),
         )
         .arg(
             Arg::new("debug")
                 .long("debug")
-                .about("Log at DEBUG level.")
+                .help("Log at DEBUG level.")
         )
         .arg(
             Arg::new("cleanup")
                 .long("cleanup")
-                .about(
+                .help(
                     "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
                 )
         )
@@ -106,7 +106,7 @@ fn args() -> ArgMatches {
                 .long("logfile")
                 .short('l')
                 .takes_value(true)
-                .about("Log file name.")
+                .help("Log file name.")
         )
         .arg(
             Arg::new("scheduler")
@@ -114,18 +114,18 @@ fn args() -> ArgMatches {
                 .takes_value(true)
                 .default_value("slurm")
                 .possible_values(&["slurm", "torque"])
-                .about("Supported schedulers")
+                .help("Supported schedulers")
         )
         .arg(Arg::new("torque-subdirs ")
             .long("torque-subdirs")
-            .about("Monitor the subdirs 0...9 in the torque spool directory")
+            .help("Monitor the subdirs 0...9 in the torque spool directory")
         )
         .arg(
             Arg::new("spool")
                 .long("spool")
                 .short('s')
                 .takes_value(true)
-                .about(
+                .help(
                     "Location of the Torque job spool (where the job scripts and XML files are kept).",
                 )
         )

@@ -44,21 +44,21 @@ pub fn clap_subcommand(command: &str) -> App {
                 .long("host")
                 .takes_value(true)
                 .default_value("localhost")
-                .about("The hostname of the ElasticSearch server"),
+                .help("The hostname of the ElasticSearch server"),
         )
         .arg(
             Arg::new("port")
                 .long("port")
                 .takes_value(true)
                 .default_value("9200")
-                .about("The port of the ElasticSearch service"),
+                .help("The port of the ElasticSearch service"),
         )
         .arg(
             Arg::new("index")
                 .long("index")
                 .takes_value(true)
                 .required(true)
-                .about("The index where the documents will be put"),
+                .help("The index where the documents will be put"),
         )
 }
 //use elastic::http::header::{self, AUTHORIZATION, HeaderValue};
