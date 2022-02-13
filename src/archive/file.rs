@@ -37,7 +37,7 @@ pub fn clap_subcommand(command: &str) -> App {
                 .long("archive")
                 .short('a')
                 .takes_value(true)
-                .about("Location of the job scripts' archive."),
+                .help("Location of the job scripts' archive."),
         )
         .arg(
             Arg::new("period")
@@ -47,7 +47,7 @@ pub fn clap_subcommand(command: &str) -> App {
                 .possible_value("yearly")
                 .possible_value("monthly")
                 .possible_value("daily")
-                .about(
+                .help(
                     "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
                 )
         )
