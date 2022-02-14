@@ -40,21 +40,21 @@ pub fn clap_subcommand(command: &str) -> App {
                 .long("brokers")
                 .takes_value(true)
                 .default_value("localhost:9092")
-                .about("Comma-separated list of brokers"),
+                .help("Comma-separated list of brokers"),
         )
         .arg(
             Arg::new("topic")
                 .long("topic")
                 .takes_value(true)
                 .default_value("sarchive")
-                .about("Topic under which to send messages to Kafka"),
+                .help("Topic under which to send messages to Kafka"),
         )
         .arg(
             Arg::new("message.timeout")
                 .long("message.timeout")
                 .takes_value(true)
                 .default_value("5000")
-                .about("Message timout in ms"),
+                .help("Message timout in ms"),
         )
         .arg(
             Arg::new("security.protocol")
@@ -65,19 +65,19 @@ pub fn clap_subcommand(command: &str) -> App {
                 .possible_value("SSL")
                 .possible_value("SASL_PLAINTEXT")
                 .possible_value("SASL_SSL")
-                .about("Protocol used to communicate with Kafka"),
+                .help("Protocol used to communicate with Kafka"),
         )
         .arg(
             Arg::new("ssl")
                 .long("ssl")
                 .takes_value(true)
-                .about("Comma separated list of librdkafka ssl options"),
+                .help("Comma separated list of librdkafka ssl options"),
         )
         .arg(
             Arg::new("sasl")
                 .long("sasl")
                 .takes_value(true)
-                .about("Comma separated list of librdkafka sasl options"),
+                .help("Comma separated list of librdkafka sasl options"),
         )
 }
 

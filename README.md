@@ -17,7 +17,7 @@ that have not yet released a version with the features we use.
 
 ## Minimum supported `rustc`
 
-`1.55`
+`1.58.1`
 
 This version is what we test against in CI. We also test on
   - stable
