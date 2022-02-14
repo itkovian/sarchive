@@ -17,10 +17,9 @@ jobs:
         uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: ${{ matrix.rust }}
+          components: clippy
           override: true
       - run: sudo apt-get install libsasl2-dev  libsasl2-2
-      - name: Install clippy
-        run: rustup component add clippy
       - name: Run cargo clippy
         uses: actions-rs/clippy-check@v1.0.7
         with:
@@ -43,9 +42,8 @@ jobs:
         uses: actions-rs/toolchain@v1.0.7
         with:
           toolchain: ${{ matrix.rust }}
+          components: rustfmt
           override: true
-      - name: Install rustfmt
-        run: rustup component add rustfmt
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1.0.3
         with:
