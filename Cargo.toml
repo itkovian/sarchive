@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.12.4"
+version = "0.12.5"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2021"
 description = "Archival tool for slurm job scripts"
@@ -17,25 +17,26 @@ coveralls = { repository = "itkovian/sarchive" }
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-chrono = { version = "0.4.11", features = ["serde"] }
-clap = "3.0.14"
+chrono = { version = "0.4.19", features = ["serde"] }
+clap = "3.2.8"
 crossbeam = "0.8.0"
-crossbeam-channel = "0.5.0"
-crossbeam-queue = "0.3.0"
-crossbeam-utils = "0.8.0"
-fern = { version = "0.6", features = ["reopen-03"]}
+crossbeam-channel = "0.5.5"
+crossbeam-queue = "0.3.5"
+crossbeam-utils = "0.8.10"
+fern = { version = "0.6.1", features = ["reopen-03"]}
 glob = "0.3.0"
-notify = "5.0.0-pre.13"
+notify = "5.0.0-pre.15"
 libc = "0.2.68"
 log = "^0.4"
 reopen = "1.0.1"
-signal-hook = "0.3.1"
+signal-hook = "0.3.14"
 
 elastic = { version = "~0.21.0-pre.5", optional = true }
 elastic_derive = { version = "~0.21.0-pre.5", optional = true }
 serde = { version = "^1.0", features = ["derive"], optional = true }
 serde_derive = { version = "^1.0", optional = true }
 serde_json = { version = "^1.0", optional = true }
+sasl2-sys = "0.1.20"
 rdkafka = { version = "0.28.0", optional = true, features = ["ssl", "sasl"]}
 itertools = "0.10.0"
 
@@ -52,7 +53,7 @@ elasticsearch-7 = ["elastic", "elastic_derive", "serde", "serde_derive", "serde_
 kafka = ["rdkafka", "serde", "serde_derive", "serde_json"]
 
 [dev-dependencies]
-tempfile = "3.0.7"
+tempfile = "3.3"
 
 [package.metadata.rpm.cargo]
 buildflags = ["--release", "--all-features"]
