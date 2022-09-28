@@ -79,9 +79,8 @@ pub fn monitor(
 
     info!("Watching path {:?}", path);
 
-    if let Err(e) = watcher.watch(path, RecursiveMode::NonRecursive) {
-        return Err(e);
-    }
+    watcher.watch(path, RecursiveMode::NonRecursive)?;
+
     #[allow(clippy::zero_ptr, clippy::drop_copy)]
     loop {
         select! {

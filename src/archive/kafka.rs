@@ -128,17 +128,12 @@ impl KafkaArchive {
             matches.value_of("security.protocol").unwrap()
         );
 
-        let ssl = matches.value_of("ssl").map(|ssl| {
-            ssl.split(',')
-                .map(|s| s.split('='))
-                .flatten()
-                .tuples()
-                .collect()
-        });
+        let ssl = matches
+            .value_of("ssl")
+            .map(|ssl| ssl.split(',').flat_map(|s| s.split('=')).tuples().collect());
         let sasl = matches.value_of("sasl").map(|sasl| {
             sasl.split(',')
-                .map(|s| s.split('='))
-                .flatten()
+                .flat_map(|s| s.split('='))
                 .tuples()
                 .collect()
         });
