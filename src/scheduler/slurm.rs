@@ -143,7 +143,7 @@ impl JobInfo for SlurmJobEntry {
     /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
         self.env_.as_ref().map(|s| {
-            let s = String::from_utf8_lossy(&s.split_at(4).1.to_vec()).to_string();
+            let s = String::from_utf8_lossy(s.split_at(4).1).to_string();
             s.split('\0')
                 .filter_map(|s| {
                     let s = s.trim();
@@ -225,7 +225,7 @@ impl Scheduler for Slurm {
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, _dirname)) = is_job_path(event_path) {
             Some(Box::new(SlurmJobEntry::new(
-                &event_path.to_path_buf(),
+                event_path,
                 jobid,
                 &self.cluster,
             )))
