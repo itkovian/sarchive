@@ -104,7 +104,7 @@ impl FileArchive {
             _ => Period::None,
         };
 
-        Ok(FileArchive::new(&archive.to_path_buf(), period))
+        Ok(FileArchive::new(archive, period))
     }
 }
 

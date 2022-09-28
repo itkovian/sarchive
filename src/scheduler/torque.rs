@@ -195,7 +195,7 @@ impl Scheduler for Torque {
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, filename)) = is_job_path(event_path) {
             Some(Box::new(TorqueJobEntry::new(
-                &filename.to_path_buf(),
+                filename,
                 jobid,
                 &self.cluster,
             )))

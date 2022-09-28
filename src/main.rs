@@ -182,7 +182,7 @@ fn main() -> Result<(), std::io::Error> {
 
     // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
-    let sched = create(&scheduler_kind, &base.to_path_buf(), cluster);
+    let sched = create(&scheduler_kind, base, cluster);
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {
