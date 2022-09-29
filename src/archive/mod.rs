@@ -27,19 +27,32 @@ pub mod elastic;
 #[cfg(feature = "kafka")]
 pub mod kafka;
 
-use clap::ArgMatches;
+use clap::Subcommand;
 use crossbeam_channel::{select, Receiver};
 use log::{debug, error, info};
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 #[cfg(feature = "elasticsearch-7")]
-use self::elastic::ElasticArchive;
+use self::elastic::{ElasticArchive, ElasticArgs};
+
 #[cfg(feature = "kafka")]
-use self::kafka::KafkaArchive;
+use self::kafka::{KafkaArchive, KafkaArgs};
+
 use super::scheduler::job::JobInfo;
-use file::FileArchive;
+use file::{FileArchive, FileArgs};
 use std::thread::sleep;
 use std::time::Duration;
+
+#[derive(Subcommand)]
+pub enum Archiver {
+    File(FileArgs),
+
+    #[cfg(feature = "kafka")]
+    Kafka(KafkaArgs),
+
+    #[cfg(feature = "elasticsearch-7")]
+    Elasticsearch(ElasticArgs),
+}
 
 /// The Archive trait should be implemented by every backend.
 #[allow(clippy::borrowed_box)]
@@ -47,26 +60,22 @@ pub trait Archive: Send {
     fn archive(&self, slurm_job_entry: &Box<dyn JobInfo>) -> Result<(), Error>;
 }
 
-pub fn archive_builder(matches: &ArgMatches) -> Result<Box<dyn Archive>, Error> {
-    match matches.subcommand() {
-        Some(("file", command_matches)) => {
-            let archive = FileArchive::build(command_matches)?;
+pub fn archive_builder(archiver: &Archiver) -> Result<Box<dyn Archive>, Error> {
+    match archiver {
+        Archiver::File(args) => {
+            let archive = FileArchive::build(args)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "elasticsearch-7")]
-        Some(("elasticsearch", run_matches)) => {
-            let archive = ElasticArchive::build(run_matches)?;
+        Archiver::Elasticsearch(args) => {
+            let archive = ElasticArchive::build(args)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "kafka")]
-        Some(("kafka", run_matches)) => {
-            let archive = KafkaArchive::build(run_matches)?;
+        Archiver::Kafka(kafka_args) => {
+            let archive = KafkaArchive::build(kafka_args)?;
             Ok(Box::new(archive))
         }
-        _ => Err(Error::new(
-            ErrorKind::Other,
-            "No supported archival subcommand used",
-        )),
     }
 }
 

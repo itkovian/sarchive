@@ -23,62 +23,45 @@ SOFTWARE.
 use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
-use clap::{App, Arg, ArgMatches};
+use clap::{Args, ValueEnum};
+use enum_display_derive::Display;
 use itertools::Itertools;
 use log::{debug, info};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{BaseRecord, DefaultProducerContext, ThreadedProducer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::io::{Error, ErrorKind};
 
-pub fn clap_subcommand(command: &str) -> App {
-    App::new(command)
-        .about("Archive to Kafka")
-        .arg(
-            Arg::new("brokers")
-                .long("brokers")
-                .takes_value(true)
-                .default_value("localhost:9092")
-                .help("Comma-separated list of brokers"),
-        )
-        .arg(
-            Arg::new("topic")
-                .long("topic")
-                .takes_value(true)
-                .default_value("sarchive")
-                .help("Topic under which to send messages to Kafka"),
-        )
-        .arg(
-            Arg::new("message.timeout")
-                .long("message.timeout")
-                .takes_value(true)
-                .default_value("5000")
-                .help("Message timout in ms"),
-        )
-        .arg(
-            Arg::new("security.protocol")
-                .long("security.protocol")
-                .takes_value(true)
-                .default_value("PLAINTEXT")
-                .possible_value("PLAINTEXT")
-                .possible_value("SSL")
-                .possible_value("SASL_PLAINTEXT")
-                .possible_value("SASL_SSL")
-                .help("Protocol used to communicate with Kafka"),
-        )
-        .arg(
-            Arg::new("ssl")
-                .long("ssl")
-                .takes_value(true)
-                .help("Comma separated list of librdkafka ssl options"),
-        )
-        .arg(
-            Arg::new("sasl")
-                .long("sasl")
-                .takes_value(true)
-                .help("Comma separated list of librdkafka sasl options"),
-        )
+#[derive(Args)]
+pub struct KafkaArgs {
+    #[arg(long, help = "Comma-separated list of brokers")]
+    brokers: String,
+
+    #[arg(long, help = "Topic under which to send messages to Kafka", default_value_t = String::from("sarchive"))]
+    topic: String,
+
+    #[arg(long, help = "Message timeout in ms", default_value_t = String::from("5000"))]
+    message_timeout: String,
+
+    #[arg(long, help = "Protocol used to communicate with Kafka", default_value_t = SecurityProtocol::Plaintext)]
+    security_protocol: SecurityProtocol,
+
+    #[arg(long, help = "SSL options for the underlying Kafka lib")]
+    ssl: Option<String>,
+
+    #[arg(long, help = "SASL options for the underlying Kafka lib")]
+    sasl: Option<String>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Display, ValueEnum)]
+pub enum SecurityProtocol {
+    Plaintext,
+    Ssl,
+    Sasl_plaintext,
+    Sasl_ssl,
 }
 
 pub struct KafkaArchive {
@@ -88,28 +71,35 @@ pub struct KafkaArchive {
 
 impl KafkaArchive {
     pub fn new(
-        brokers: &str,
-        topic: &str,
-        message_timeout: &str,
-        security_protocol: &str,
+        brokers: &String,
+        topic: &String,
+        message_timeout: &String,
+        security_protocol: &SecurityProtocol,
         ssl: &Option<Vec<(&str, &str)>>,
         sasl: &Option<Vec<(&str, &str)>>,
     ) -> Self {
         let mut p = ClientConfig::new()
             .set("bootstrap.servers", brokers)
             .set("message.timeout.ms", message_timeout)
-            .set("security.protocol", security_protocol)
+            .set(
+                "security.protocol",
+                security_protocol
+                    .to_string()
+                    .to_uppercase()
+                    .replace('-', "_"),
+            )
             .to_owned();
 
         if let Some(ssl) = ssl {
             for (k, v) in ssl.iter() {
-                debug!("Setting kafka ssl property {} with value {}", k, v);
+                debug!("Setting kafka ssl property {k} with value {v}");
                 p.set(*k, *v);
             }
         }
 
         if let Some(sasl) = sasl {
             for (k, v) in sasl.iter() {
+                debug!("Setting kafka sasl property {k} with value {v}");
                 p.set(*k, *v);
             }
         }
@@ -120,32 +110,32 @@ impl KafkaArchive {
         }
     }
 
-    pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
+    pub fn build(args: &KafkaArgs) -> Result<Self, Error> {
         info!(
             "Using Kafka archival, talking to {} on topic {} using protocol {}",
-            matches.value_of("brokers").unwrap(),
-            matches.value_of("topic").unwrap(),
-            matches.value_of("security.protocol").unwrap()
+            args.brokers,
+            args.topic,
+            args.security_protocol
         );
 
-        let ssl = matches
-            .value_of("ssl")
-            .map(|ssl| ssl.split(',').flat_map(|s| s.split('=')).tuples().collect());
-        let sasl = matches.value_of("sasl").map(|sasl| {
-            sasl.split(',')
-                .flat_map(|s| s.split('='))
-                .tuples()
-                .collect()
-        });
+        let ssl = args
+            .ssl
+            .as_ref()
+            .map(|s| s.split(',').flat_map(|s| s.split('=')).tuples().collect());
 
-        debug!("Using ssl options {:?}", ssl);
-        debug!("Using sasl options {:?}", sasl);
+        let sasl = args
+            .sasl
+            .as_ref()
+            .map(|s| s.split(',').flat_map(|s| s.split('=')).tuples().collect());
+
+        debug!("Using ssl options {ssl:?}");
+        debug!("Using sasl options {sasl:?}");
 
         Ok(KafkaArchive::new(
-            matches.value_of("brokers").unwrap(),
-            matches.value_of("topic").unwrap(),
-            matches.value_of("message.timeout").unwrap(),
-            matches.value_of("security.protocol").unwrap(),
+            &args.brokers,
+            &args.topic,
+            &args.message_timeout,
+            &args.security_protocol,
             &ssl,
             &sasl,
         ))

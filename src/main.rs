@@ -20,12 +20,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-use clap::{App, Arg, ArgMatches};
+use clap::Parser;
+
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
 use log::{error, info};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -35,19 +36,14 @@ mod monitor;
 mod scheduler;
 mod utils;
 
-#[cfg(feature = "elasticsearch-7")]
-use archive::elastic as el;
-use archive::file;
-#[cfg(feature = "kafka")]
-use archive::kafka as kf;
-use archive::{archive_builder, process, Archive};
+use archive::{archive_builder, process, Archive, Archiver};
+
 use monitor::monitor;
 use scheduler::{create, SchedulerKind};
 use utils::{register_signal_handler, signal_handler_atomic};
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-fn setup_logging(debug: bool, logfile: Option<&str>) -> Result<(), log::SetLoggerError> {
+fn setup_logging(debug: bool, logfile: Option<PathBuf>) -> Result<(), log::SetLoggerError> {
     let level_filter = if debug {
         log::LevelFilter::Debug
     } else {
@@ -68,7 +64,7 @@ fn setup_logging(debug: bool, logfile: Option<&str>) -> Result<(), log::SetLogge
 
     match logfile {
         Some(filename) => {
-            let r = fern::log_reopen(&PathBuf::from(filename), Some(libc::SIGHUP)).unwrap();
+            let r = fern::log_reopen(&filename, Some(libc::SIGHUP)).unwrap();
             base_config.chain(r)
         }
         None => base_config.chain(std::io::stdout()),
@@ -76,97 +72,80 @@ fn setup_logging(debug: bool, logfile: Option<&str>) -> Result<(), log::SetLogge
     .apply()
 }
 
+#[derive(Parser)]
+#[command(author, version, about)]
+struct Cli {
+    #[arg(
+        long,
+        help = "Name of the cluster where the jobs have been submitted to."
+    )]
+    cluster: String,
+
+    #[arg(long)]
+    debug: bool,
+
+    #[arg(
+        long,
+        help = "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
+    )]
+    cleanup: bool,
+
+    #[arg(long, help = "Log file name.")]
+    logfile: Option<PathBuf>,
+
+    #[arg(long)]
+    torque_subdirs: bool,
+
+    #[arg(long)]
+    spool: PathBuf,
+
+    #[arg(long)]
+    scheduler: SchedulerKind,
+
+    #[command(subcommand)]
+    archiver: Archiver,
+}
+
+<<<<<<< HEAD
+/*
+#[cfg(feature = "elasticsearch-7")]
 fn args() -> ArgMatches {
     let matches = App::new("SArchive")
         .version(VERSION)
         .author("Andy Georges <itkovian+sarchive@gmail.com>")
         .about("Archive slurm user job scripts.")
-        .arg(
-            Arg::new("cluster")
-                .long("cluster")
-                .short('c')
-                .takes_value(true)
-                .required(true)
-                .help("Name of the cluster where the jobs have been submitted to."),
-        )
-        .arg(
-            Arg::new("debug")
-                .long("debug")
-                .help("Log at DEBUG level.")
-        )
-        .arg(
-            Arg::new("cleanup")
-                .long("cleanup")
-                .help(
-                    "[Experimental] Process already received events when the program is terminated with SIGINT or SIGTERM"
-                )
-        )
-        .arg(
-            Arg::new("logfile")
-                .long("logfile")
-                .short('l')
-                .takes_value(true)
-                .help("Log file name.")
-        )
-        .arg(
-            Arg::new("scheduler")
-                .long("scheduler")
-                .takes_value(true)
-                .default_value("slurm")
-                .possible_values(["slurm", "torque"])
-                .help("Supported schedulers")
-        )
-        .arg(Arg::new("torque-subdirs ")
-            .long("torque-subdirs")
-            .help("Monitor the subdirs 0...9 in the torque spool directory")
-        )
-        .arg(
-            Arg::new("spool")
-                .long("spool")
-                .short('s')
-                .takes_value(true)
-                .help(
-                    "Location of the Torque job spool (where the job scripts and XML files are kept).",
-                )
-        )
-        .subcommand(file::clap_subcommand("file"));
+*/
 
-    #[cfg(feature = "elasticsearch-7")]
-    let matches = matches.subcommand(el::clap_subcommand("elasticsearch"));
+||||||| parent of e00c26a (fix: clap argument refactor)
+/*
+#[cfg(feature = "elasticsearch-7")]
+fn args() -> ArgMatches {
+    let matches = App::new("SArchive")
+        .version(VERSION)
+        .author("Andy Georges <itkovian+sarchive@gmail.com>")
+*/
 
-    #[cfg(feature = "kafka")]
-    let matches = matches.subcommand(kf::clap_subcommand("kafka"));
-
-    matches.get_matches()
-}
-
+=======
+>>>>>>> e00c26a (fix: clap argument refactor)
 fn main() -> Result<(), std::io::Error> {
-    let matches = args();
+    //let matches = args();
+    let cli = Cli::parse();
 
-    match setup_logging(matches.is_present("debug"), matches.value_of("logfile")) {
+    match setup_logging(cli.debug, cli.logfile) {
         Ok(_) => (),
         Err(e) => panic!("Cannot set up logging: {e:?}"),
     };
-    let base = Path::new(
-        matches
-            .value_of("spool")
-            .expect("You must provide the location of the spool dir."),
-    );
+    let base = cli.spool.to_owned();
+
     // FIXME: Check for permissions to read directory contents
     if !base.is_dir() {
-        error!("Provided spool {:?} is not a valid directory", base);
+        error!("Provided spool {:?} is not a valid directory", &base);
         exit(1);
     }
 
-    let scheduler_kind = match matches.value_of("scheduler") {
-        Some("slurm") => SchedulerKind::Slurm,
-        Some("torque") => SchedulerKind::Torque,
-        _ => panic!("Unsupported scheduler"), // This should have been handled by clap, so never arrive here
-    };
-    let archiver: Box<dyn Archive> = archive_builder(&matches).unwrap();
-    let cluster = matches
-        .value_of("cluster")
-        .expect("Cluster argument is mandatory");
+    let scheduler_kind = cli.scheduler;
+    let archiver: Box<dyn Archive> = archive_builder(&cli.archiver).unwrap();
+    let cluster = cli.cluster;
 
     info!("sarchive starting. Watching spool {:?}.", &base);
 
@@ -178,11 +157,11 @@ fn main() -> Result<(), std::io::Error> {
     register_signal_handler(signal_hook::consts::SIGINT, unparker, &notification);
 
     let (sig_sender, sig_receiver) = bounded(20);
-    let cleanup = matches.is_present("cleanup");
+    let cleanup = cli.cleanup;
 
     // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
-    let sched = create(&scheduler_kind, base, cluster);
+    let sched = create(&scheduler_kind, &base, &cluster);
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {
@@ -190,15 +169,16 @@ fn main() -> Result<(), std::io::Error> {
             info!("Signal handled");
         });
 
-        for loc in sched.watch_locations(&matches) {
+        for loc in sched.watch_locations() {
             let t = &sender;
             let sr = &sig_receiver;
             let sl = &sched;
+            let b = &base;
             s.spawn(move |_| match monitor(sl, &loc, t, sr) {
                 Ok(_) => info!("Stopped watching location {:?}", &loc),
                 Err(e) => {
                     error!("{:?}", e);
-                    panic!("Error watching {:?}", &base);
+                    panic!("Error watching {:?}", &b);
                 }
             });
         }

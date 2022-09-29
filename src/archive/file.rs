@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use clap::{App, Arg, ArgMatches};
+use clap::{Args, ValueEnum};
 use log::{debug, error, warn};
 use std::fs::{create_dir_all, File};
 use std::io::{Error, Write};
@@ -29,31 +29,14 @@ use super::Archive;
 use crate::scheduler::job::JobInfo;
 
 /// Command line options for the file archiver subcommand
-pub fn clap_subcommand(command: &str) -> App {
-    App::new(command)
-        .about("Archive to the filesystem")
-        .arg(
-            Arg::new("archive")
-                .long("archive")
-                .short('a')
-                .takes_value(true)
-                .help("Location of the job scripts' archive."),
-        )
-        .arg(
-            Arg::new("period")
-                .long("period")
-                .short('p')
-                .takes_value(true)
-                .possible_value("yearly")
-                .possible_value("monthly")
-                .possible_value("daily")
-                .help(
-                    "Archive under a YYYY subdirectory (yearly), YYYYMM (monthly), or YYYYMMDD (daily)."
-                )
-        )
+#[derive(Args)]
+pub struct FileArgs {
+    archive: PathBuf,
+    period: Period,
 }
 
 /// An enum to define a hierachy in the archive
+#[derive(Clone, ValueEnum)]
 pub enum Period {
     /// Leads to a YYYYMMDD subdir
     Daily,
@@ -65,46 +48,35 @@ pub enum Period {
     None,
 }
 
-/// An aerchiver that writes job script info to a file
+/// An archiver that writes job script info to a file
 pub struct FileArchive {
     archive_path: PathBuf,
     period: Period,
 }
 
 impl FileArchive {
-    pub fn new(archive_path: &Path, p: Period) -> Self {
+    pub fn new(archive_path: &PathBuf, p: &Period) -> Self {
         FileArchive {
-            archive_path: archive_path.to_path_buf(),
-            period: p,
+            archive_path: archive_path.to_owned(),
+            period: p.to_owned(),
         }
     }
 
-    pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
-        let archive = Path::new(
-            matches
-                .value_of("archive")
-                .expect("You must provide the location of the archive"),
-        );
+    pub fn build(args: &FileArgs) -> Result<Self, Error> {
+        let archive = args.archive.to_owned();
 
         if !archive.is_dir() {
             warn!(
                 "Provided archive {:?} is not a valid directory, creating it.",
                 &archive
             );
-            if let Err(e) = create_dir_all(archive) {
+            if let Err(e) = create_dir_all(&archive) {
                 error!("Unable to create archive at {:?}. {}", &archive, e);
                 return Err(e);
             }
         };
 
-        let period = match matches.value_of("period") {
-            Some("yearly") => Period::Yearly,
-            Some("monthly") => Period::Monthly,
-            Some("daily") => Period::Daily,
-            _ => Period::None,
-        };
-
-        Ok(FileArchive::new(archive, period))
+        Ok(FileArchive::new(&archive, &args.period))
     }
 }
 
@@ -222,7 +194,7 @@ mod tests {
             assert!(false);
         }
 
-        let file_archiver = FileArchive::new(&archive_dir, Period::None);
+        let file_archiver = FileArchive::new(&archive_dir, &Period::None);
         let jobinfo: Box<dyn JobInfo> = Box::new(slurm_job_entry);
         file_archiver.archive(&jobinfo).unwrap();
 
