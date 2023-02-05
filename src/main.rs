@@ -42,7 +42,6 @@ use monitor::monitor;
 use scheduler::{create, SchedulerKind};
 use utils::{register_signal_handler, signal_handler_atomic};
 
-
 fn setup_logging(debug: bool, logfile: Option<PathBuf>) -> Result<(), log::SetLoggerError> {
     let level_filter = if debug {
         log::LevelFilter::Debug
@@ -106,27 +105,6 @@ struct Cli {
     archiver: Archiver,
 }
 
-<<<<<<< HEAD
-/*
-#[cfg(feature = "elasticsearch-7")]
-fn args() -> ArgMatches {
-    let matches = App::new("SArchive")
-        .version(VERSION)
-        .author("Andy Georges <itkovian+sarchive@gmail.com>")
-        .about("Archive slurm user job scripts.")
-*/
-
-||||||| parent of e00c26a (fix: clap argument refactor)
-/*
-#[cfg(feature = "elasticsearch-7")]
-fn args() -> ArgMatches {
-    let matches = App::new("SArchive")
-        .version(VERSION)
-        .author("Andy Georges <itkovian+sarchive@gmail.com>")
-*/
-
-=======
->>>>>>> e00c26a (fix: clap argument refactor)
 fn main() -> Result<(), std::io::Error> {
     //let matches = args();
     let cli = Cli::parse();

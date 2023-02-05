@@ -113,9 +113,7 @@ impl KafkaArchive {
     pub fn build(args: &KafkaArgs) -> Result<Self, Error> {
         info!(
             "Using Kafka archival, talking to {} on topic {} using protocol {}",
-            args.brokers,
-            args.topic,
-            args.security_protocol
+            args.brokers, args.topic, args.security_protocol
         );
 
         let ssl = args
