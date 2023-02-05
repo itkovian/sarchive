@@ -113,7 +113,7 @@ fn args() -> ArgMatches {
                 .long("scheduler")
                 .takes_value(true)
                 .default_value("slurm")
-                .possible_values(&["slurm", "torque"])
+                .possible_values(["slurm", "torque"])
                 .help("Supported schedulers")
         )
         .arg(Arg::new("torque-subdirs ")
@@ -145,7 +145,7 @@ fn main() -> Result<(), std::io::Error> {
 
     match setup_logging(matches.is_present("debug"), matches.value_of("logfile")) {
         Ok(_) => (),
-        Err(e) => panic!("Cannot set up logging: {:?}", e),
+        Err(e) => panic!("Cannot set up logging: {e:?}"),
     };
     let base = Path::new(
         matches

@@ -85,7 +85,7 @@ impl JobInfo for TorqueJobEntry {
     // the backup or ship the information to some consumer
     fn read_job_info(&mut self) -> Result<(), Error> {
         let dir = self.path_.parent().unwrap();
-        let filename = self.path_.strip_prefix(&dir).unwrap();
+        let filename = self.path_.strip_prefix(dir).unwrap();
         self.jobname_ = Some(filename.to_str().unwrap().to_string());
         self.script_ = Some(utils::read_file(dir, filename, None)?);
 
@@ -108,7 +108,7 @@ impl JobInfo for TorqueJobEntry {
                 .filter_map(|jb_path| {
                     if let Ok(jb_path) = jb_path {
                         let jb_dir = jb_path.parent()?;
-                        let jb_filename = jb_path.strip_prefix(&jb_dir).unwrap();
+                        let jb_filename = jb_path.strip_prefix(jb_dir).unwrap();
                         let jb = utils::read_file(jb_dir, jb_filename, Some(10)).unwrap();
                         Some((jb_filename.to_owned(), jb))
                     } else {
@@ -184,9 +184,7 @@ impl Torque {
 impl Scheduler for Torque {
     fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf> {
         if matches.is_present("subdirs") {
-            (0..=9)
-                .map(|sd| self.base.join(format!("{}", sd)))
-                .collect()
+            (0..=9).map(|sd| self.base.join(format!("{sd}"))).collect()
         } else {
             [self.base.clone()].to_vec()
         }
