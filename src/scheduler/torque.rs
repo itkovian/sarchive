@@ -184,9 +184,7 @@ impl Torque {
 impl Scheduler for Torque {
     fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf> {
         if matches.is_present("subdirs") {
-            (0..=9)
-                .map(|sd| self.base.join(format!("{sd}")))
-                .collect()
+            (0..=9).map(|sd| self.base.join(format!("{sd}"))).collect()
         } else {
             [self.base.clone()].to_vec()
         }
