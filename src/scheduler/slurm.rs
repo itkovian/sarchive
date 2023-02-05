@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use clap::ArgMatches;
+use clap::Args;
 use log::debug;
 use notify::event::{CreateKind, Event, EventKind};
 use std::collections::HashMap;
@@ -31,6 +31,9 @@ use std::time::Instant;
 use super::job::JobInfo;
 use super::Scheduler;
 use crate::utils;
+
+#[derive(Args)]
+pub struct SlurmArgs {}
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
@@ -211,7 +214,7 @@ impl Scheduler for Slurm {
     ///
     /// * _matches: reference the ArgMatches in case we pass command line
     ///             options, which is not done atm.
-    fn watch_locations(&self, _matches: &ArgMatches) -> Vec<PathBuf> {
+    fn watch_locations(&self) -> Vec<PathBuf> {
         (0..=9)
             .map(|hash| self.base.join(format!("hash.{hash}")))
             .collect()

@@ -23,7 +23,7 @@ SOFTWARE.
 use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
-use clap::{App, Arg, ArgMatches};
+use clap::Args;
 use elastic_derive::ElasticType;
 use log::{debug, error, info};
 use serde::{Deserialize, Serialize};
@@ -32,35 +32,22 @@ use std::collections::HashMap;
 use std::io::Error;
 use std::process::exit;
 
-/// Command line options for the elastic archiver subcommand
-pub fn clap_subcommand(command: &str) -> App {
-    App::new(command)
-        .about("Archive to ElasticSearch")
-        /*.arg(
-            Arg::with_name("auth")
-        )*/
-        .arg(
-            Arg::new("host")
-                .long("host")
-                .takes_value(true)
-                .default_value("localhost")
-                .help("The hostname of the ElasticSearch server"),
-        )
-        .arg(
-            Arg::new("port")
-                .long("port")
-                .takes_value(true)
-                .default_value("9200")
-                .help("The port of the ElasticSearch service"),
-        )
-        .arg(
-            Arg::new("index")
-                .long("index")
-                .takes_value(true)
-                .required(true)
-                .help("The index where the documents will be put"),
-        )
+#[derive(Args)]
+pub struct ElasticArgs {
+    #[arg(long, help = "Hostname of the ES server")]
+    host: String,
+
+    #[arg(
+        long,
+        help = "Port on which the ES server listens",
+        default_value_t = 9200
+    )]
+    port: u16,
+
+    #[arg(long, help = "Index to which we want to write the document")]
+    index: String,
 }
+
 //use elastic::http::header::{self, AUTHORIZATION, HeaderValue};
 use elastic::client::{SyncClient, SyncClientBuilder};
 
@@ -131,7 +118,7 @@ fn create_index(
 }
 
 impl ElasticArchive {
-    pub fn new(host: &str, port: u16, index: String) -> Self {
+    pub fn new(host: &str, port: u16, index: &str) -> Self {
         let client = SyncClientBuilder::new()
             .sniff_nodes(format!("http://{host}:{port}")) // TODO: use a pool for serde
             .build()
@@ -140,7 +127,7 @@ impl ElasticArchive {
         // We create the index if it does not exist
         if let Ok(response) = client.index(index.to_owned()).exists().send() {
             if !response.exists() {
-                create_index(&client, index).unwrap();
+                create_index(&client, index.to_owned()).unwrap();
             }
         } else {
             error!("Cannot check if index exists. Quitting.");
@@ -159,13 +146,9 @@ impl ElasticArchive {
         }
     }
 
-    pub fn build(matches: &ArgMatches) -> Result<Self, Error> {
+    pub fn build(args: &ElasticArgs) -> Result<Self, Error> {
         info!("Using ElasticSearch archival");
-        Ok(ElasticArchive::new(
-            matches.value_of("host").unwrap(),
-            matches.value_of("port").unwrap().parse::<u16>().unwrap(),
-            matches.value_of("index").unwrap().to_owned(),
-        ))
+        Ok(ElasticArchive::new(&args.host, args.port, &args.index))
     }
 }
 

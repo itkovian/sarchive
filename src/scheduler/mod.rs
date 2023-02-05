@@ -24,20 +24,30 @@ pub mod job;
 pub mod slurm;
 pub mod torque;
 
-use clap::ArgMatches;
+use clap::{Subcommand, ValueEnum};
 use notify::event::Event;
 use std::path::{Path, PathBuf};
 
 use job::JobInfo;
+use slurm::SlurmArgs;
+use torque::TorqueArgs;
 
 /// Denotes the schedulers SArchive supports
+// FIXME: this is a bit redundant, given the subcommands
+#[derive(Clone, ValueEnum)]
 pub enum SchedulerKind {
     Slurm,
     Torque,
 }
 
+#[derive(Subcommand)]
+pub enum SchedArgs {
+    Slurm(SlurmArgs),
+    Torque(TorqueArgs),
+}
+
 pub trait Scheduler: Send + Sync {
-    fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf>;
+    fn watch_locations(&self) -> Vec<PathBuf>;
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
     fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>>;
 }
