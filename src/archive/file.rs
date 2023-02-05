@@ -91,7 +91,7 @@ impl FileArchive {
                 "Provided archive {:?} is not a valid directory, creating it.",
                 &archive
             );
-            if let Err(e) = create_dir_all(&archive) {
+            if let Err(e) = create_dir_all(archive) {
                 error!("Unable to create archive at {:?}. {}", &archive, e);
                 return Err(e);
             }
@@ -117,7 +117,7 @@ impl Archive for FileArchive {
         debug!("Target path: {:?}", target_path);
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
-            let mut f = File::create(target_path.join(&fname))?;
+            let mut f = File::create(target_path.join(fname))?;
             f.write_all(fcontents)?;
         }
         Ok(())
