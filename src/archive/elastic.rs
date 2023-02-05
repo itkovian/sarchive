@@ -133,7 +133,7 @@ fn create_index(
 impl ElasticArchive {
     pub fn new(host: &str, port: u16, index: String) -> Self {
         let client = SyncClientBuilder::new()
-            .sniff_nodes(format!("http://{host}:{port}", host = host, port = port)) // TODO: use a pool for serde
+            .sniff_nodes(format!("http://{host}:{port}")) // TODO: use a pool for serde
             .build()
             .unwrap();
 
