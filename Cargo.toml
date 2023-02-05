@@ -18,7 +18,7 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 chrono = { version = "0.4.19", features = ["serde"] }
-clap = "3.2.8"
+clap = "4.1.4"
 crossbeam = "0.8.0"
 crossbeam-channel = "0.5.5"
 crossbeam-queue = "0.3.5"
