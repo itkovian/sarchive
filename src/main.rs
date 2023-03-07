@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2024 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,9 @@ use clap::Parser;
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
+use gethostname::gethostname;
 use log::{error, info};
+use regex::Regex;
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
@@ -98,8 +100,11 @@ struct Cli {
     #[arg(long)]
     spool: PathBuf,
 
-    #[arg(long)]
+    #[arg(long, required = true)]
     scheduler: SchedulerKind,
+
+    #[arg(long)]
+    filter_regex: Option<String>,
 
     #[command(subcommand)]
     archiver: Archiver,
@@ -121,9 +126,16 @@ fn main() -> Result<(), std::io::Error> {
         exit(1);
     }
 
-    let scheduler_kind = cli.scheduler;
-    let archiver: Box<dyn Archive> = archive_builder(&cli.archiver).unwrap();
+    let scheduler = cli.scheduler;
+    let archiver: Box<dyn Archive> = archive_builder(cli.archiver).unwrap();
     let cluster = cli.cluster;
+    let hostname = gethostname().to_string_lossy().to_string();
+    let filter_regex = if let Some(r) = cli.filter_regex {
+        info!("Setting filter regex to {}", &r);
+        Regex::new(&r).ok()
+    } else {
+        None
+    };
 
     info!("sarchive starting. Watching spool {:?}.", &base);
 
@@ -139,7 +151,7 @@ fn main() -> Result<(), std::io::Error> {
 
     // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
-    let sched = create(&scheduler_kind, &base, &cluster);
+    let sched = create(&scheduler, &base, &cluster, &hostname, &filter_regex);
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {

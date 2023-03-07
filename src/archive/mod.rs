@@ -1,5 +1,5 @@
 /*
-Copyright 2019-2020 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2024 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,8 +22,6 @@ SOFTWARE.
 
 pub mod file;
 
-#[cfg(feature = "elasticsearch-7")]
-pub mod elastic;
 #[cfg(feature = "kafka")]
 pub mod kafka;
 
@@ -31,9 +29,6 @@ use clap::Subcommand;
 use crossbeam_channel::{select, Receiver};
 use log::{debug, error, info};
 use std::io::Error;
-
-#[cfg(feature = "elasticsearch-7")]
-use self::elastic::{ElasticArchive, ElasticArgs};
 
 #[cfg(feature = "kafka")]
 use self::kafka::{KafkaArchive, KafkaArgs};
@@ -43,15 +38,12 @@ use file::{FileArchive, FileArgs};
 use std::thread::sleep;
 use std::time::Duration;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum Archiver {
     File(FileArgs),
 
     #[cfg(feature = "kafka")]
     Kafka(KafkaArgs),
-
-    #[cfg(feature = "elasticsearch-7")]
-    Elasticsearch(ElasticArgs),
 }
 
 /// The Archive trait should be implemented by every backend.
@@ -60,15 +52,10 @@ pub trait Archive: Send {
     fn archive(&self, slurm_job_entry: &Box<dyn JobInfo>) -> Result<(), Error>;
 }
 
-pub fn archive_builder(archiver: &Archiver) -> Result<Box<dyn Archive>, Error> {
+pub fn archive_builder(archiver: Archiver) -> Result<Box<dyn Archive>, Error> {
     match archiver {
         Archiver::File(args) => {
             let archive = FileArchive::build(args)?;
-            Ok(Box::new(archive))
-        }
-        #[cfg(feature = "elasticsearch-7")]
-        Archiver::Elasticsearch(args) => {
-            let archive = ElasticArchive::build(args)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "kafka")]
@@ -91,7 +78,7 @@ pub fn process(
 ) -> Result<(), Error> {
     info!("Start processing events");
 
-    #[allow(clippy::zero_ptr, clippy::drop_copy)]
+    #[allow(clippy::zero_ptr, dropping_copy_types)]
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {
@@ -153,14 +140,14 @@ mod tests {
     }
 
     #[test]
-    fn test_process() {
+    fn test_process_cleanup() {
         let (tx1, rx1) = unbounded();
         let (tx2, rx2) = unbounded();
         let archiver = Box::new(DummyArchiver);
 
         scope(|s| {
             let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-            let slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
+            let slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", "master", None);
             s.spawn(move |_| match process(archiver, &rx1, &rx2, false) {
                 Ok(v) => assert_eq!(v, ()),
                 Err(_) => panic!("Unexpected error from process function"),

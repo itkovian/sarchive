@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2024 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -34,7 +34,8 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{Error, ErrorKind};
 
-#[derive(Args)]
+/// Command line options for the kafka archiver subcommand
+#[derive(Args, Debug)]
 pub struct KafkaArgs {
     #[arg(long, help = "Comma-separated list of brokers")]
     brokers: String,
@@ -56,7 +57,7 @@ pub struct KafkaArgs {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Display, ValueEnum)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Display, ValueEnum, Debug)]
 pub enum SecurityProtocol {
     Plaintext,
     Ssl,
@@ -70,6 +71,24 @@ pub struct KafkaArchive {
 }
 
 impl KafkaArchive {
+    /// Creates a new `KafkaArchive` instance with the specified Kafka configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `brokers` - A reference to the Kafka brokers (comma-separated list).
+    /// * `topic` - A reference to the Kafka topic for archiving.
+    /// * `message_timeout` - A reference to the message timeout duration.
+    /// * `security_protocol` - A reference to the `SecurityProtocol` enum indicating the security protocol.
+    /// * `ssl` - An optional reference to SSL configuration.
+    /// * `sasl` - An optional reference to SASL configuration.
+    ///
+    /// # Returns
+    ///
+    /// A new `KafkaArchive` instance.
+    ///
+    /// # Panics
+    ///
+    /// Panics if there is an error creating the Kafka producer.
     pub fn new(
         brokers: &String,
         topic: &String,
@@ -110,7 +129,16 @@ impl KafkaArchive {
         }
     }
 
-    pub fn build(args: &KafkaArgs) -> Result<Self, Error> {
+    /// Builds a `KafkaArchive` instance based on the provided `KafkaArgs`.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - A reference to the `KafkaArgs` struct containing Kafka configuration.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing the created `KafkaArchive` instance or an error.
+    pub fn build(args: KafkaArgs) -> Result<Self, Error> {
         info!(
             "Using Kafka archival, talking to {} on topic {} using protocol {}",
             args.brokers, args.topic, args.security_protocol
@@ -147,6 +175,7 @@ struct JobMessage {
     pub timestamp: DateTime<Utc>,
     pub cluster: String,
     pub script: String,
+    pub hostname: String,
     pub environment: Option<HashMap<String, String>>,
 }
 
@@ -161,6 +190,7 @@ impl Archive for KafkaArchive {
             id: job_entry.jobid(),
             timestamp: Utc::now(),
             cluster: job_entry.cluster(),
+            hostname: job_entry.hostname(),
             script: job_entry.script(),
             environment: job_entry.extra_info(),
         };
@@ -189,5 +219,107 @@ impl Archive for KafkaArchive {
     }
 }
 
+#[cfg(feature = "kafka")]
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+    use mockito::Server;
+    use std::collections::HashMap;
+
+    use super::*;
+    use crate::scheduler::job::JobInfo;
+
+    #[derive(Debug)]
+    struct DummyJobInfo;
+
+    impl JobInfo for DummyJobInfo {
+        fn jobid(&self) -> String {
+            "123".to_string()
+        }
+
+        fn moment(&self) -> std::time::Instant {
+            std::time::Instant::now()
+        }
+
+        fn cluster(&self) -> String {
+            "test_cluster".to_string()
+        }
+
+        fn hostname(&self) -> String {
+            "master".to_string()
+        }
+
+        fn read_job_info(&mut self) -> Result<(), std::io::Error> {
+            Ok(())
+        }
+
+        fn files(&self) -> Vec<(String, Vec<u8>)> {
+            vec![
+                ("file1.txt".to_string(), b"contents1".to_vec()),
+                ("file2.txt".to_string(), b"contents2".to_vec()),
+            ]
+        }
+
+        fn script(&self) -> String {
+            "echo 'Hello, World!'".to_string()
+        }
+
+        fn extra_info(&self) -> Option<HashMap<String, String>> {
+            Some(HashMap::new())
+        }
+    }
+
+    #[test]
+    fn test_kafka_archive_new() {
+        // Mock the Kafka broker
+        let mut s = Server::new();
+        let _m = s.mock("GET", "/").with_status(200).create();
+
+        let brokers = format!("http://{}", s.url());
+        let topic = "test_topic".to_string();
+        let message_timeout = "5000".to_string();
+        let security_protocol = SecurityProtocol::Plaintext;
+        let ssl = None;
+        let sasl = None;
+
+        let kafka_archive = KafkaArchive::new(
+            &brokers,
+            &topic,
+            &message_timeout,
+            &security_protocol,
+            &ssl,
+            &sasl,
+        );
+
+        // Assert that the KafkaArchive was created successfully
+        assert_eq!(kafka_archive.topic, topic);
+    }
+
+    #[test]
+    fn test_kafka_archive_build() {
+        // Mock the Kafka broker
+        let mut s = mockito::Server::new();
+        let _m = s.mock("GET", "/").with_status(200).create();
+
+        let brokers = format!("http://{}", s.url());
+        let topic = "test_topic".to_string();
+        let message_timeout = "5000".to_string();
+        let security_protocol = SecurityProtocol::Plaintext;
+        let ssl = None;
+        let sasl = None;
+
+        let kafka_args = KafkaArgs {
+            brokers,
+            topic: topic.clone(),
+            message_timeout,
+            security_protocol,
+            ssl,
+            sasl,
+        };
+
+        let kafka_archive = KafkaArchive::build(kafka_args).unwrap();
+
+        // Assert that the KafkaArchive was built successfully
+        assert_eq!(kafka_archive.topic, topic);
+    }
+}
