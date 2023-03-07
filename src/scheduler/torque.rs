@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use clap::ArgMatches;
+use clap::Args;
 use glob::glob;
 use log::debug;
 use notify::event::{CreateKind, Event, EventKind};
@@ -32,6 +32,11 @@ use super::job::JobInfo;
 use super::Scheduler;
 
 use crate::utils;
+
+#[derive(Args)]
+pub struct TorqueArgs {
+    subdirs: bool,
+}
 
 pub struct TorqueJobEntry {
     /// The full path to the file that needs to be archived
@@ -170,6 +175,7 @@ impl JobInfo for TorqueJobEntry {
 pub struct Torque {
     pub base: PathBuf,
     pub cluster: String,
+    pub subdirs: bool,
 }
 
 impl Torque {
@@ -177,13 +183,14 @@ impl Torque {
         Torque {
             base: base.to_path_buf(),
             cluster: cluster.to_string(),
+            subdirs: true, // FIXME: get from the cli argument
         }
     }
 }
 
 impl Scheduler for Torque {
-    fn watch_locations(&self, matches: &ArgMatches) -> Vec<PathBuf> {
-        if matches.is_present("subdirs") {
+    fn watch_locations(&self) -> Vec<PathBuf> {
+        if self.subdirs {
             (0..=9).map(|sd| self.base.join(format!("{sd}"))).collect()
         } else {
             [self.base.clone()].to_vec()
