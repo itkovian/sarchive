@@ -78,7 +78,6 @@ jobs:
           - nightly
           - 1.64.0
         features:
-          - --features elasticsearch-7
           - --features kafka
           - --no-default-features
           - --all-features
