@@ -22,8 +22,6 @@ SOFTWARE.
 
 pub mod file;
 
-#[cfg(feature = "elasticsearch-7")]
-pub mod elastic;
 #[cfg(feature = "kafka")]
 pub mod kafka;
 
@@ -31,9 +29,6 @@ use clap::Subcommand;
 use crossbeam_channel::{select, Receiver};
 use log::{debug, error, info};
 use std::io::Error;
-
-#[cfg(feature = "elasticsearch-7")]
-use self::elastic::{ElasticArchive, ElasticArgs};
 
 #[cfg(feature = "kafka")]
 use self::kafka::{KafkaArchive, KafkaArgs};
@@ -49,9 +44,6 @@ pub enum Archiver {
 
     #[cfg(feature = "kafka")]
     Kafka(KafkaArgs),
-
-    #[cfg(feature = "elasticsearch-7")]
-    Elasticsearch(ElasticArgs),
 }
 
 /// The Archive trait should be implemented by every backend.
@@ -64,11 +56,6 @@ pub fn archive_builder(archiver: &Archiver) -> Result<Box<dyn Archive>, Error> {
     match archiver {
         Archiver::File(args) => {
             let archive = FileArchive::build(args)?;
-            Ok(Box::new(archive))
-        }
-        #[cfg(feature = "elasticsearch-7")]
-        Archiver::Elasticsearch(args) => {
-            let archive = ElasticArchive::build(args)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "kafka")]

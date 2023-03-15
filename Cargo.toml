@@ -23,8 +23,6 @@ crossbeam = "~0.8"
 crossbeam-channel = "~0.5"
 crossbeam-queue = "~0.3"
 crossbeam-utils = "~0.8"
-#elastic = { version = "~0.21.0-pre.5", optional = true }
-#elastic_derive = { version = "~0.21.0-pre.5", optional = true }
 enum-display-derive = "0.1.1"
 fern = { version = "0.6.1", features = ["reopen-03"]}
 glob = "0.3.1"
@@ -50,7 +48,6 @@ name = "sarchive"
 path = "src/main.rs"
 
 [features]
-#elasticsearch-7 = ["elastic", "elastic_derive", "serde", "serde_derive", "serde_json"]
 kafka = ["rdkafka", "serde", "serde_derive", "serde_json"]
 
 [dev-dependencies]
