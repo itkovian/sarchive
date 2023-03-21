@@ -170,6 +170,10 @@ impl JobInfo for TorqueJobEntry {
                 .collect(),
         )
     }
+
+    fn job_completion_info(&self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 pub struct Torque {
@@ -197,7 +201,7 @@ impl Scheduler for Torque {
         }
     }
 
-    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
+    fn construct_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, filename)) = is_job_path(event_path) {
             Some(Box::new(TorqueJobEntry::new(
                 filename,
@@ -209,6 +213,7 @@ impl Scheduler for Torque {
         }
     }
 
+    // TODO: should we also check for deletion here?
     fn verify_event_kind(&self, event: &Event) -> Option<SchedulerEvent> {
         if let Event {
             kind: EventKind::Create(CreateKind::File),

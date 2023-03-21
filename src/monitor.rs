@@ -39,22 +39,35 @@ use super::scheduler::{Scheduler, SchedulerEvent};
 #[allow(clippy::borrowed_box)]
 fn check_and_queue(
     scheduler: &Box<dyn Scheduler>,
-    s: &Sender<Box<dyn JobInfo>>,
+    sc: &Sender<Box<dyn JobInfo>>,
+    sr: &Sender<Box<dyn JobInfo>>,
     event: Event,
 ) -> Result<(), std::io::Error> {
     debug!("Event received: {:?}", event);
 
     match scheduler.verify_event_kind(&event) {
         Some(SchedulerEvent::Create(paths)) => scheduler
-            .create_job_info(&paths[0])
+            .construct_job_info(&paths[0])
             .ok_or_else(|| {
                 Error::new(
                     ErrorKind::Other,
-                    "Could not create job info structure".to_owned(),
+                    "Could not make job creation info structure".to_owned(),
                 )
             })
             .and_then(|jobinfo| {
-                s.send(jobinfo)
+                sc.send(jobinfo)
+                    .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))
+            }),
+        Some(SchedulerEvent::Remove(paths)) => scheduler
+            .construct_job_info(&paths[0])
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::Other,
+                    "Could not make job removal info structure".to_owned(),
+                )
+            })
+            .and_then(|jobinfo| {
+                sr.send(jobinfo)
                     .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))
             }),
         _ => Ok(()),
@@ -69,7 +82,8 @@ fn check_and_queue(
 pub fn monitor(
     scheduler: &Box<dyn Scheduler>,
     path: &Path,
-    s: &Sender<Box<dyn JobInfo>>,
+    sc: &Sender<Box<dyn JobInfo>>,
+    sr: &Sender<Box<dyn JobInfo>>,
     sigchannel: &Receiver<bool>,
 ) -> notify::Result<()> {
     let (tx, rx) = unbounded();
@@ -89,7 +103,7 @@ pub fn monitor(
             },
             recv(rx) -> event => {
                 match event {
-                    Ok(Ok(e)) => check_and_queue(scheduler, s, e)?,
+                    Ok(Ok(e)) => check_and_queue(scheduler, sc, sr, e)?,
                     Ok(Err(_)) | Err(_) => {
                         error!("Error on received event: {:?}", event);
                         break Err(notify::Error::new(notify::ErrorKind::Generic("Problem receiving event".to_string())));

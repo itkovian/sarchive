@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2023 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -48,6 +48,9 @@ pub trait JobInfo: Send {
 
     // Return additional information as a set of key-value pairs
     fn extra_info(&self) -> Option<HashMap<String, String>>;
+
+    // Get the job completion info from the scheduler
+    fn job_completion_info(&self) -> Result<(), Error>;
 }
 
 #[cfg(test)]

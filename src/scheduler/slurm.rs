@@ -25,6 +25,7 @@ use notify::event::{CreateKind, Event, EventKind, RemoveKind};
 use std::collections::HashMap;
 use std::io::Error;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::string::String;
 use std::time::Instant;
 
@@ -49,6 +50,8 @@ pub struct SlurmJobEntry {
     script_: Option<Vec<u8>>,
     /// The job's environment in Slurm
     env_: Option<Vec<u8>>,
+    /// The job's completion info in Slurm
+    info_: Option<String>,
 }
 
 impl SlurmJobEntry {
@@ -81,6 +84,7 @@ impl SlurmJobEntry {
             moment_: Instant::now(),
             script_: None,
             env_: None,
+            info_: None,
         }
     }
 }
@@ -169,6 +173,35 @@ impl JobInfo for SlurmJobEntry {
                 .collect::<HashMap<String, String>>()
         })
     }
+
+    fn job_completion_info(&self) -> Result<(), Error> {
+        // Get information from the Slurm DBD about the job, using the slurm sacct command
+
+        let sacct_fields = vec![
+            "User",
+            "Start",
+            "End",
+            "Elapsed",
+            "AllocTRES",
+            "NCPUS",
+            "ExitCode",
+        ];
+
+        let output = Command::new("/usr/bin/sacct")
+            .arg("--job")
+            .arg(self.jobid().to_string())
+            .arg("--parsable2")
+            .arg("-o")
+            .arg(sacct_fields.join(","))
+            .output()?;
+
+        if output.status.success() {
+            //String::from_utf8(output.stdout)?.lines();
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
 }
 
 /// Representation of the Slurm scheduler
@@ -225,7 +258,7 @@ impl Scheduler for Slurm {
     /// # Arguments
     ///
     /// * event_path: A `Path to the job directory that
-    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
+    fn construct_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, _dirname)) = is_job_path(event_path) {
             Some(Box::new(SlurmJobEntry::new(
                 event_path,

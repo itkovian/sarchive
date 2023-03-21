@@ -66,22 +66,22 @@ pub fn archive_builder(archiver: &Archiver) -> Result<Box<dyn Archive>, Error> {
     }
 }
 
-/// The process function consumes job entries and call the archive function for each
+/// The process function consumes creation job entries and calls the archive function for each
 /// received entry.
 /// At the same time, it also checks if there is an incoming notification that it should
 /// stop processing. Upon receipt, it will cease operations immediately.
-pub fn process(
+pub fn process_create(
     archiver: Box<dyn Archive>,
     r: &Receiver<Box<dyn JobInfo>>,
     sigchannel: &Receiver<bool>,
     cleanup: bool,
 ) -> Result<(), Error> {
-    info!("Start processing events");
+    info!("Start processing create events");
 
     #[allow(clippy::zero_ptr, clippy::drop_copy)]
     loop {
         select! {
-            recv(sigchannel) -> b => if let Ok(true) = b  {
+            recv(sigchannel) -> b => if let Ok(true) = b {
                 if !cleanup {
                     info!("Stopped processing entries, {} skipped", r.len());
                 } else {
@@ -113,7 +113,49 @@ pub fn process(
         }
     }
 
-    debug!("Processing loop exited");
+    debug!("Processing creation loop exited");
+    Ok(())
+}
+
+/// The process_remove function consumes job removal events and gets the necessary data from the
+/// scheduler before sending the information to the archive.
+pub fn process_remove(
+    archiver: Box<dyn Archive>,
+    r: &Receiver<Box<dyn JobInfo>>,
+    sigchannel: &Receiver<bool>,
+    cleanup: bool,
+) -> Result<(), Error> {
+    info!("Start processing removal events");
+
+    #[allow(clippy::zero_ptr, clippy::drop_copy)]
+    loop {
+        select! {
+            recv(sigchannel) -> b => if let Ok(true) = b {
+                if !cleanup {
+                        info!("Stopped processing entries, {} skipped", r.len());
+                } else {
+                    info!("Processing {} entries, then stopping", r.len());
+                    for mut entry in r.iter() {
+                        entry.read_job_info()?;
+                        archiver.archive(&entry)?;
+                    }
+                    info!("Done processing");
+                }
+                break;
+            },
+            recv(r) -> entry => {
+                if let Ok(mut job_entry) = entry {
+                    job_entry.job_completion_info()?;
+                    archiver.archive(&job_entry)?;
+                } else {
+                    error!("Error on receiving JobEntry info");
+                    break;
+                }
+            }
+        }
+    }
+
+    debug!("Processing removal loop ended");
     Ok(())
 }
 
@@ -148,7 +190,7 @@ mod tests {
         scope(|s| {
             let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
             let slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
-            s.spawn(move |_| match process(archiver, &rx1, &rx2, false) {
+            s.spawn(move |_| match process_create(archiver, &rx1, &rx2, false) {
                 Ok(v) => assert_eq!(v, ()),
                 Err(_) => panic!("Unexpected error from process function"),
             });

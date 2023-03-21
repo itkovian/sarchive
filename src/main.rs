@@ -36,7 +36,7 @@ mod monitor;
 mod scheduler;
 mod utils;
 
-use archive::{archive_builder, process, Archive, Archiver};
+use archive::{archive_builder, process_create, process_remove, Archive, Archiver};
 
 use monitor::monitor;
 use scheduler::{create, SchedulerKind};
@@ -122,7 +122,8 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     let scheduler_kind = cli.scheduler;
-    let archiver: Box<dyn Archive> = archive_builder(&cli.archiver).unwrap();
+    let create_archiver: Box<dyn Archive> = archive_builder(&cli.archiver).unwrap();
+    let remove_archiver: Box<dyn Archive> = archive_builder(&cli.archiver).unwrap();
     let cluster = cli.cluster;
 
     info!("sarchive starting. Watching spool {:?}.", &base);
@@ -137,8 +138,14 @@ fn main() -> Result<(), std::io::Error> {
     let (sig_sender, sig_receiver) = bounded(20);
     let cleanup = cli.cleanup;
 
-    // we will watch the locations provided by the scheduler
-    let (sender, receiver) = unbounded();
+    // We build two pipelines.
+    // - the create pipeline needs to process events quickly, as we need to get the information
+    //   before the job fails, is cancelled, or runs to completion
+    // - the remove pipeline processes events that can fetch their information at leisure, since
+    //   the required data can be requested at all times from the scheduler
+    let (create_sender, create_receiver) = unbounded();
+    let (remove_sender, remove_receiver) = unbounded();
+
     let sched = create(&scheduler_kind, &base, &cluster);
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
@@ -148,11 +155,12 @@ fn main() -> Result<(), std::io::Error> {
         });
 
         for loc in sched.watch_locations() {
-            let t = &sender;
+            let cs = &create_sender;
+            let rs = &remove_sender;
             let sr = &sig_receiver;
             let sl = &sched;
             let b = &base;
-            s.spawn(move |_| match monitor(sl, &loc, t, sr) {
+            s.spawn(move |_| match monitor(sl, &loc, cs, rs, sr) {
                 Ok(_) => info!("Stopped watching location {:?}", &loc),
                 Err(e) => {
                     error!("{:?}", e);
@@ -161,12 +169,21 @@ fn main() -> Result<(), std::io::Error> {
             });
         }
 
-        let r = &receiver;
+        let cr = &create_receiver;
         let sr = &sig_receiver;
         s.spawn(move |_| {
-            match process(archiver, r, sr, cleanup) {
-                Ok(()) => info!("Processing completed succesfully"),
-                Err(e) => error!("processing failed: {:?}", e),
+            match process_create(create_archiver, cr, sr, cleanup) {
+                Ok(()) => info!("Processing creation completed succesfully"),
+                Err(e) => error!("Processing creation failed: {:?}", e),
+            };
+        });
+
+        let rr = &remove_receiver;
+        let sr = &sig_receiver;
+        s.spawn(move |_| {
+            match process_remove(remove_archiver, rr, sr, cleanup) {
+                Ok(()) => info!("Processing removal completed succesfully"),
+                Err(e) => error!("Processing removal failed: {:?}", e),
             };
         });
     }) {
