@@ -190,6 +190,8 @@ impl JobInfo for SlurmJobEntry {
         let output = Command::new("/usr/bin/sacct")
             .arg("--job")
             .arg(self.jobid().to_string())
+            .arg("--cluster")
+            .arg(self.cluster().to_string())
             .arg("--parsable2")
             .arg("-o")
             .arg(sacct_fields.join(","))
