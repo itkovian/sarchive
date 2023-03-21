@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use super::job::JobInfo;
-use super::Scheduler;
+use super::{Scheduler, SchedulerEvent};
 
 use crate::utils;
 
@@ -209,14 +209,14 @@ impl Scheduler for Torque {
         }
     }
 
-    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>> {
+    fn verify_event_kind(&self, event: &Event) -> Option<SchedulerEvent> {
         if let Event {
             kind: EventKind::Create(CreateKind::File),
             paths,
             ..
         } = event
         {
-            Some(paths.to_vec())
+            Some(SchedulerEvent::Create(paths.to_vec()))
         } else {
             None
         }

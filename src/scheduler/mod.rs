@@ -46,10 +46,16 @@ pub enum SchedArgs {
     Torque(TorqueArgs),
 }
 
+#[derive(Clone)]
+pub enum SchedulerEvent {
+    Create(Vec<PathBuf>),
+    Remove(Vec<PathBuf>),
+}
+
 pub trait Scheduler: Send + Sync {
     fn watch_locations(&self) -> Vec<PathBuf>;
     fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
-    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>>;
+    fn verify_event_kind(&self, event: &Event) -> Option<SchedulerEvent>;
 }
 
 pub fn create(kind: &SchedulerKind, spool_path: &Path, cluster: &str) -> Box<dyn Scheduler> {

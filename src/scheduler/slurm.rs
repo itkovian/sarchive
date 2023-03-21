@@ -21,7 +21,7 @@ SOFTWARE.
 */
 use clap::Args;
 use log::debug;
-use notify::event::{CreateKind, Event, EventKind};
+use notify::event::{CreateKind, Event, EventKind, RemoveKind};
 use std::collections::HashMap;
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -29,7 +29,7 @@ use std::string::String;
 use std::time::Instant;
 
 use super::job::JobInfo;
-use super::Scheduler;
+use super::{Scheduler, SchedulerEvent};
 use crate::utils;
 
 #[derive(Args)]
@@ -237,16 +237,15 @@ impl Scheduler for Slurm {
         }
     }
 
-    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>> {
-        if let Event {
-            kind: EventKind::Create(CreateKind::Folder),
-            paths,
-            ..
-        } = event
-        {
-            Some(paths.to_vec())
-        } else {
-            None
+    fn verify_event_kind(&self, event: &Event) -> Option<SchedulerEvent> {
+        match event.kind {
+            EventKind::Create(CreateKind::Folder) => {
+                Some(SchedulerEvent::Create(event.paths.to_vec()))
+            }
+            EventKind::Remove(RemoveKind::Folder) => {
+                Some(SchedulerEvent::Remove(event.paths.to_vec()))
+            }
+            _ => None,
         }
     }
 }

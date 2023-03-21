@@ -31,7 +31,7 @@ use std::io::{Error, ErrorKind};
 use std::path::Path;
 
 use super::scheduler::job::JobInfo;
-use super::scheduler::Scheduler;
+use super::scheduler::{Scheduler, SchedulerEvent};
 
 /// The check_and_queue function verifies that the inotify event pertains
 /// and actual Slurm job entry and pushes the correct information to the
@@ -45,7 +45,7 @@ fn check_and_queue(
     debug!("Event received: {:?}", event);
 
     match scheduler.verify_event_kind(&event) {
-        Some(paths) => scheduler
+        Some(SchedulerEvent::Create(paths)) => scheduler
             .create_job_info(&paths[0])
             .ok_or_else(|| {
                 Error::new(
