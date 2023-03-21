@@ -29,7 +29,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use super::job::JobInfo;
-use super::Scheduler;
+use super::{Scheduler, SchedulerEvent};
 
 use crate::utils;
 
@@ -170,6 +170,14 @@ impl JobInfo for TorqueJobEntry {
                 .collect(),
         )
     }
+
+    fn job_completion_info(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn extra_completion_info(&self) -> Option<HashMap<String, String>> {
+        None
+    }
 }
 
 pub struct Torque {
@@ -197,7 +205,7 @@ impl Scheduler for Torque {
         }
     }
 
-    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
+    fn construct_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, filename)) = is_job_path(event_path) {
             Some(Box::new(TorqueJobEntry::new(
                 filename,
@@ -209,14 +217,15 @@ impl Scheduler for Torque {
         }
     }
 
-    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>> {
+    // TODO: should we also check for deletion here?
+    fn verify_event_kind(&self, event: &Event) -> Option<SchedulerEvent> {
         if let Event {
             kind: EventKind::Create(CreateKind::File),
             paths,
             ..
         } = event
         {
-            Some(paths.to_vec())
+            Some(SchedulerEvent::Create(paths.to_vec()))
         } else {
             None
         }

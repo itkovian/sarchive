@@ -140,33 +140,87 @@ impl KafkaArchive {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+enum MessageKind {
+    Creation,
+    Removal,
+}
+
 #[cfg(feature = "kafka")]
 #[derive(Serialize, Deserialize)]
-struct JobMessage {
+struct JobCreationMessage {
     pub id: String,
     pub timestamp: DateTime<Utc>,
     pub cluster: String,
     pub script: String,
     pub environment: Option<HashMap<String, String>>,
+    pub kind: MessageKind,
+}
+
+#[cfg(feature = "kafka")]
+#[derive(Serialize, Deserialize)]
+struct JobRemovalMessage {
+    pub id: String,
+    pub timestamp: DateTime<Utc>,
+    pub cluster: String,
+    pub completion_info: Option<HashMap<String, String>>,
+    pub kind: MessageKind,
 }
 
 impl Archive for KafkaArchive {
-    fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
+    fn archive_creation(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         debug!(
             "Kafka archiver, received an entry for job ID {}",
             job_entry.jobid()
         );
 
-        let doc = JobMessage {
+        let doc = JobCreationMessage {
             id: job_entry.jobid(),
             timestamp: Utc::now(),
             cluster: job_entry.cluster(),
             script: job_entry.script(),
             environment: job_entry.extra_info(),
+            kind: MessageKind::Creation,
         };
 
         if let Ok(serial) = serde_json::to_string(&doc) {
             debug!("Serialisation succeeded");
+            match self
+                .producer
+                .send::<str, str>(BaseRecord::to(&self.topic).payload(&serial))
+            {
+                Ok(_) => {
+                    debug!("Message produced correctly");
+                    Ok(())
+                }
+                Err((_e, _)) => {
+                    debug!("Could not produce job entry");
+                    Ok(())
+                }
+            }
+        } else {
+            Err(Error::new(
+                ErrorKind::InvalidData,
+                "Cannot convert job info to JSON",
+            ))
+        }
+    }
+
+    fn archive_removal(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
+        debug!(
+            "Kafka archiver, received an removal entry for job ID {}",
+            job_entry.jobid()
+        );
+
+        let doc = JobRemovalMessage {
+            id: job_entry.jobid(),
+            timestamp: Utc::now(),
+            cluster: job_entry.cluster(),
+            completion_info: job_entry.extra_completion_info(),
+            kind: MessageKind::Removal,
+        };
+
+        if let Ok(serial) = serde_json::to_string(&doc) {
             match self
                 .producer
                 .send::<str, str>(BaseRecord::to(&self.topic).payload(&serial))

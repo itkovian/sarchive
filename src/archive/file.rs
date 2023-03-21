@@ -83,7 +83,7 @@ impl FileArchive {
 impl Archive for FileArchive {
     /// Archives the files from the given SlurmJobEntry's path.
     ///
-    fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
+    fn archive_creation(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         let archive_path = &self.archive_path;
         let target_path = determine_target_path(archive_path, &self.period);
         debug!("Target path: {:?}", target_path);
@@ -92,6 +92,10 @@ impl Archive for FileArchive {
             let mut f = File::create(target_path.join(fname))?;
             f.write_all(fcontents)?;
         }
+        Ok(())
+    }
+
+    fn archive_removal(&self, _job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -196,7 +200,7 @@ mod tests {
 
         let file_archiver = FileArchive::new(&archive_dir, &Period::None);
         let jobinfo: Box<dyn JobInfo> = Box::new(slurm_job_entry);
-        file_archiver.archive(&jobinfo).unwrap();
+        file_archiver.archive_creation(&jobinfo).unwrap();
 
         assert!(Path::is_file(&archive_dir.join("job.1234_environment")));
         assert!(Path::is_file(&archive_dir.join("job.1234_script")));

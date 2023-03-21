@@ -21,15 +21,16 @@ SOFTWARE.
 */
 use clap::Args;
 use log::debug;
-use notify::event::{CreateKind, Event, EventKind};
+use notify::event::{CreateKind, Event, EventKind, RemoveKind};
 use std::collections::HashMap;
 use std::io::Error;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::string::String;
 use std::time::Instant;
 
 use super::job::JobInfo;
-use super::Scheduler;
+use super::{Scheduler, SchedulerEvent};
 use crate::utils;
 
 #[derive(Args)]
@@ -49,6 +50,8 @@ pub struct SlurmJobEntry {
     script_: Option<Vec<u8>>,
     /// The job's environment in Slurm
     env_: Option<Vec<u8>>,
+    /// The job's completion info in Slurm
+    info_: Option<HashMap<String, String>>,
 }
 
 impl SlurmJobEntry {
@@ -81,6 +84,7 @@ impl SlurmJobEntry {
             moment_: Instant::now(),
             script_: None,
             env_: None,
+            info_: None,
         }
     }
 }
@@ -169,6 +173,51 @@ impl JobInfo for SlurmJobEntry {
                 .collect::<HashMap<String, String>>()
         })
     }
+
+    fn job_completion_info(&mut self) -> Result<(), Error> {
+        // Get information from the Slurm DBD about the job, using the slurm sacct command
+
+        let sacct_fields = vec![
+            "User",
+            "Start",
+            "End",
+            "Elapsed",
+            "AllocTRES",
+            "NCPUS",
+            "ExitCode",
+        ];
+
+        let output = Command::new("/usr/bin/sacct")
+            .arg("--job")
+            .arg(self.jobid().to_string())
+            .arg("--cluster")
+            .arg(self.cluster().to_string())
+            .arg("--parsable2")
+            .arg("-o")
+            .arg(sacct_fields.join(","))
+            .output()?;
+
+        if output.status.success() {
+            let job_info = String::from_utf8(output.stdout).unwrap();
+            self.info_ = Some(
+                sacct_fields
+                    .iter()
+                    .map(|s| s.to_string())
+                    .zip(job_info.lines().next().iter().map(|s| s.to_string()))
+                    .collect(),
+            );
+            Ok(())
+        } else {
+            Err(Error::new(
+                std::io::ErrorKind::Other,
+                "Could not get sacct output",
+            ))
+        }
+    }
+
+    fn extra_completion_info(&self) -> Option<HashMap<String, String>> {
+        self.info_.clone()
+    }
 }
 
 /// Representation of the Slurm scheduler
@@ -225,7 +274,7 @@ impl Scheduler for Slurm {
     /// # Arguments
     ///
     /// * event_path: A `Path to the job directory that
-    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
+    fn construct_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>> {
         if let Some((jobid, _dirname)) = is_job_path(event_path) {
             Some(Box::new(SlurmJobEntry::new(
                 event_path,
@@ -237,41 +286,38 @@ impl Scheduler for Slurm {
         }
     }
 
-    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>> {
-        if let Event {
-            kind: EventKind::Create(CreateKind::Folder),
-            paths,
-            ..
-        } = event
-        {
-            Some(paths.to_vec())
-        } else {
-            None
+    fn verify_event_kind(&self, event: &Event) -> Option<SchedulerEvent> {
+        match event.kind {
+            EventKind::Create(CreateKind::Folder) => {
+                Some(SchedulerEvent::Create(event.paths.to_vec()))
+            }
+            EventKind::Remove(RemoveKind::Folder) => {
+                Some(SchedulerEvent::Remove(event.paths.to_vec()))
+            }
+            _ => None,
         }
     }
 }
 
-/// Verifies that the path metioned in the event is a that of a file that
-/// needs archival
+/// Verifies that the path metioned in the event is a that of a folder that
+/// needs archival.
 ///
-/// This ignores the path prefix, but verifies that
-/// - the path points to a file
-/// - there is a path dir component that starts with "job."
+/// This ignores the path prefix, and checks that
+/// there is a path dir component that starts with "job."
 ///
-/// For example, /var/spool/slurm/hash.3/job.01234./script is a valid path
+/// For example, /var/spool/slurm/hash.3/job.01234 is a valid path
 ///
 /// We return a tuple of two strings: the job ID and the filename, wrapped in
 /// an Option.
 pub fn is_job_path(path: &Path) -> Option<(&str, &str)> {
-    if path.is_dir() {
-        let dirname = path.file_name().unwrap().to_str().unwrap();
-
-        if dirname.starts_with("job.") {
-            return Some((path.extension().unwrap().to_str().unwrap(), dirname));
-        };
+    // The path is always a directory, by construction (RemoveKind::Folder)
+    let dirname = path.file_name()?.to_str()?;
+    if dirname.starts_with("job.") {
+        Some((path.extension().unwrap().to_str().unwrap(), dirname))
+    } else {
+        debug!("{:?} is not a considered job path", &path);
+        None
     }
-    debug!("{:?} is not a considered job path", &path);
-    None
 }
 
 #[cfg(test)]

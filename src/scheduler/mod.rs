@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2023 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -46,10 +46,16 @@ pub enum SchedArgs {
     Torque(TorqueArgs),
 }
 
+#[derive(Clone)]
+pub enum SchedulerEvent {
+    Create(Vec<PathBuf>),
+    Remove(Vec<PathBuf>),
+}
+
 pub trait Scheduler: Send + Sync {
     fn watch_locations(&self) -> Vec<PathBuf>;
-    fn create_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
-    fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>>;
+    fn construct_job_info(&self, event_path: &Path) -> Option<Box<dyn JobInfo>>;
+    fn verify_event_kind(&self, event: &Event) -> Option<SchedulerEvent>;
 }
 
 pub fn create(kind: &SchedulerKind, spool_path: &Path, cluster: &str) -> Box<dyn Scheduler> {
