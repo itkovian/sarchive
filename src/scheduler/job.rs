@@ -50,7 +50,10 @@ pub trait JobInfo: Send {
     fn extra_info(&self) -> Option<HashMap<String, String>>;
 
     // Get the job completion info from the scheduler
-    fn job_completion_info(&self) -> Result<(), Error>;
+    fn job_completion_info(&mut self) -> Result<(), Error>;
+
+    // Return runtime info as a set of key-value pairs
+    fn extra_completion_info(&self) -> Option<HashMap<String, String>>;
 }
 
 #[cfg(test)]

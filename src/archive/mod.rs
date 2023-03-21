@@ -49,7 +49,8 @@ pub enum Archiver {
 /// The Archive trait should be implemented by every backend.
 #[allow(clippy::borrowed_box)]
 pub trait Archive: Send {
-    fn archive(&self, slurm_job_entry: &Box<dyn JobInfo>) -> Result<(), Error>;
+    fn archive_creation(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error>;
+    fn archive_removal(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error>;
 }
 
 pub fn archive_builder(archiver: &Archiver) -> Result<Box<dyn Archive>, Error> {
@@ -88,7 +89,7 @@ pub fn process_create(
                     info!("Processing {} entries, then stopping", r.len());
                     for mut entry in r.iter() {
                         entry.read_job_info()?;
-                        archiver.archive(&entry)?;
+                        archiver.archive_creation(&entry)?;
                     }
                     info!("Done processing");
                 }
@@ -104,7 +105,7 @@ pub fn process_create(
                         sleep(dur);
                     }
                     job_entry.read_job_info()?;
-                    archiver.archive(&job_entry)?;
+                    archiver.archive_creation(&job_entry)?;
                 } else {
                     error!("Error on receiving JobEntry info");
                     break;
@@ -119,6 +120,8 @@ pub fn process_create(
 
 /// The process_remove function consumes job removal events and gets the necessary data from the
 /// scheduler before sending the information to the archive.
+/// At the same time, it also checks if there is an incoming notification that it should
+/// stop processing. Upon receipt, it will cease operations immediately.
 pub fn process_remove(
     archiver: Box<dyn Archive>,
     r: &Receiver<Box<dyn JobInfo>>,
@@ -137,7 +140,7 @@ pub fn process_remove(
                     info!("Processing {} entries, then stopping", r.len());
                     for mut entry in r.iter() {
                         entry.read_job_info()?;
-                        archiver.archive(&entry)?;
+                        archiver.archive_removal(&entry)?;
                     }
                     info!("Done processing");
                 }
@@ -146,7 +149,7 @@ pub fn process_remove(
             recv(r) -> entry => {
                 if let Ok(mut job_entry) = entry {
                     job_entry.job_completion_info()?;
-                    archiver.archive(&job_entry)?;
+                    archiver.archive_removal(&job_entry)?;
                 } else {
                     error!("Error on receiving JobEntry info");
                     break;
@@ -175,8 +178,13 @@ mod tests {
     struct DummyArchiver;
 
     impl Archive for DummyArchiver {
-        fn archive(&self, _: &Box<dyn JobInfo>) -> Result<(), Error> {
-            info!("Archiving");
+        fn archive_creation(&self, _: &Box<dyn JobInfo>) -> Result<(), Error> {
+            info!("Archiving creation");
+            Ok(())
+        }
+
+        fn archive_removal(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
+            info!("Archiving removal");
             Ok(())
         }
     }

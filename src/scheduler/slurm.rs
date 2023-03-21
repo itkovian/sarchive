@@ -51,7 +51,7 @@ pub struct SlurmJobEntry {
     /// The job's environment in Slurm
     env_: Option<Vec<u8>>,
     /// The job's completion info in Slurm
-    info_: Option<String>,
+    info_: Option<HashMap<String, String>>,
 }
 
 impl SlurmJobEntry {
@@ -174,7 +174,7 @@ impl JobInfo for SlurmJobEntry {
         })
     }
 
-    fn job_completion_info(&self) -> Result<(), Error> {
+    fn job_completion_info(&mut self) -> Result<(), Error> {
         // Get information from the Slurm DBD about the job, using the slurm sacct command
 
         let sacct_fields = vec![
@@ -197,10 +197,15 @@ impl JobInfo for SlurmJobEntry {
 
         if output.status.success() {
             //String::from_utf8(output.stdout)?.lines();
+            self.info_ = Some(HashMap::default());
             Ok(())
         } else {
             Ok(())
         }
+    }
+
+    fn extra_completion_info(&self) -> Option<HashMap<String, String>> {
+        self.info_.clone()
     }
 }
 

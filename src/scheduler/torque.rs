@@ -171,8 +171,12 @@ impl JobInfo for TorqueJobEntry {
         )
     }
 
-    fn job_completion_info(&self) -> Result<(), Error> {
+    fn job_completion_info(&mut self) -> Result<(), Error> {
         Ok(())
+    }
+
+    fn extra_completion_info(&self) -> Option<HashMap<String, String>> {
+        None
     }
 }
 
