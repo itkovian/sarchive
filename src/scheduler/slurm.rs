@@ -294,25 +294,19 @@ impl Scheduler for Slurm {
 /// This ignores the path prefix, and checks that
 /// there is a path dir component that starts with "job."
 ///
-///
-/// For example, /var/spool/slurm/hash.3/job.01234./script is a valid path
+/// For example, /var/spool/slurm/hash.3/job.01234 is a valid path
 ///
 /// We return a tuple of two strings: the job ID and the filename, wrapped in
 /// an Option.
 pub fn is_job_path(path: &Path) -> Option<(&str, &str)> {
     // The path is always a directory, by construction (RemoveKind::Folder)
-    debug!("Checking path {:?}", path);
-    let dirname = path.file_name().unwrap().to_str().unwrap();
-
-    debug!("dirname: {dirname}");
-    debug!("extension: {:?}", path.extension().unwrap());
-
+    let dirname = path.file_name()?.to_str()?;
     if dirname.starts_with("job.") {
-        return Some((path.extension().unwrap().to_str().unwrap(), dirname));
-    };
-
-    debug!("{:?} is not a considered job path", &path);
-    None
+        Some((path.extension().unwrap().to_str().unwrap(), dirname))
+    } else {
+        debug!("{:?} is not a considered job path", &path);
+        None
+    }
 }
 
 #[cfg(test)]
