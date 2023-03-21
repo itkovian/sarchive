@@ -196,11 +196,20 @@ impl JobInfo for SlurmJobEntry {
             .output()?;
 
         if output.status.success() {
-            //String::from_utf8(output.stdout)?.lines();
-            self.info_ = Some(HashMap::default());
+            let job_info = String::from_utf8(output.stdout).unwrap();
+            self.info_ = Some(
+                sacct_fields
+                    .iter()
+                    .map(|s| s.to_string())
+                    .zip(job_info.lines().next().iter().map(|s| s.to_string()))
+                    .collect(),
+            );
             Ok(())
         } else {
-            Ok(())
+            Err(Error::new(
+                std::io::ErrorKind::Other,
+                "Could not get sacct output",
+            ))
         }
     }
 
