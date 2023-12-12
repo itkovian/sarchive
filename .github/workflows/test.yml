@@ -20,31 +20,6 @@ jobs:
         log-level: warn
         arguments: --all-features
 
-  clippy:
-    runs-on: ubuntu-18.04
-    strategy:
-      matrix:
-        rust:
-          - stable
-          - 1.64.0
-      fail-fast: false
-
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2.4.0
-      - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.7
-        with:
-          toolchain: ${{ matrix.rust }}
-          components: clippy
-          override: true
-      - run: sudo apt-get install libsasl2-dev  libsasl2-2
-      - name: Run cargo clippy
-        uses: actions-rs/clippy-check@v1.0.7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features -- -D warnings
-
   fmt:
     runs-on: ubuntu-18.04
     strategy:

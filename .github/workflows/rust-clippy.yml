@@ -15,8 +15,6 @@ on:
   pull_request:
     # The branches below must be a subset of the branches above
     branches: [ "develop" ]
-  schedule:
-    - cron: '41 18 * * 4'
 
 jobs:
   rust-clippy-analyze:
