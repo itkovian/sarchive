@@ -26,7 +26,6 @@ jobs:
       matrix:
         rust:
           - stable
-          - 1.64.0
       fail-fast: false
 
     steps:
@@ -51,7 +50,6 @@ jobs:
         rust:
           - stable
           - nightly
-          - 1.64.0
         features:
           - --features kafka
           - --no-default-features
