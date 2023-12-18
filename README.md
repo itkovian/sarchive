@@ -17,9 +17,9 @@ that have not yet released a version with the features we use.
 
 ## Minimum supported `rustc`
 
-`1.64.0`
+`1.70.0`
 
-This version is what we test against in CI. We also test on
+CI tests run against the following Rust versions:
   - stable
   - nightly
 
