@@ -81,7 +81,7 @@ pub fn monitor(
 
     watcher.watch(path, RecursiveMode::NonRecursive)?;
 
-    #[allow(clippy::zero_ptr, clippy::drop_copy)]
+    #[allow(clippy::zero_ptr, dropping_copy_types)]
     loop {
         select! {
             recv(sigchannel) -> b => if let Ok(true) = b  {

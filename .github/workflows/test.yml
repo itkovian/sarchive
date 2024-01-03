@@ -1,43 +1,36 @@
 name: sarchive tests
 on: [push, pull_request]
 jobs:
-  clippy:
-    runs-on: ubuntu-18.04
+  cargo-deny:
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        rust:
-          - stable
-          - 1.64.0
-      fail-fast: false
+        checks:
+          - advisories
+          - bans
+
+    # Prevent sudden announcement of a new advisory from failing ci:
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
 
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v2.4.0
-      - name: Install toolchain
-        uses: actions-rs/toolchain@v1.0.7
-        with:
-          toolchain: ${{ matrix.rust }}
-          components: clippy
-          override: true
-      - run: sudo apt-get install libsasl2-dev  libsasl2-2
-      - name: Run cargo clippy
-        uses: actions-rs/clippy-check@v1.0.7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features -- -D warnings
+    - uses: actions/checkout@v4
+    - uses: EmbarkStudios/cargo-deny-action@v1
+      with:
+        command: check ${{ matrix.checks }}
+        log-level: warn
+        arguments: --all-features
 
   fmt:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         rust:
           - stable
-          - 1.64.0
       fail-fast: false
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v4
       - name: Install toolchain
         uses: actions-rs/toolchain@v1.0.7
         with:
@@ -51,15 +44,13 @@ jobs:
           args: --all -- --check
 
   test:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         rust:
           - stable
           - nightly
-          - 1.64.0
         features:
-          - --features elasticsearch-7
           - --features kafka
           - --no-default-features
           - --all-features
@@ -67,7 +58,7 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2.4.0
+        uses: actions/checkout@v4
       - name: Install toolchain
         uses: actions-rs/toolchain@v1.0.7
         with:

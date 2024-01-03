@@ -17,9 +17,9 @@ that have not yet released a version with the features we use.
 
 ## Minimum supported `rustc`
 
-`1.64.0`
+`1.70.0`
 
-This version is what we test against in CI. We also test on
+CI tests run against the following Rust versions:
   - stable
   - nightly
 
@@ -65,17 +65,12 @@ For example,
 
 `sarchive --cluster huppel -s /var/spool/slurm file --archive /var/backups/slurm/job-archive`
 
-### Elasticsearch archival
+### Elasticsearch archival (removed)
 
-If you want to maintain the job script archive on another machine and/or make it easily searchable,
-use the Elasticsearch backend. The shipped data structure contains a timestamp along with the job script
-and potentially other relevant information (at the scheduler's discretion).
+The Elasticsearch backend will be revamped, as using the elastic crate is subject to a
+vulnerability through its hyper dependency (https://rustsec.org/advisories/RUSTSEC-2021-0078)
 
-We do not yet support SSL/TLS or authentication with the ES backend.
-
-For example,
-
-`sarchive --cluster huppel -s /var/spool/slurm elasticsearch --host myelastic.mydomain --index slurm-job-archive`
+This will be added again once we can move to the official Elastic.co crate.
 
 ### Kafka archival
 
