@@ -36,7 +36,7 @@ pub struct FileArgs {
 }
 
 /// An enum to define a hierachy in the archive
-#[derive(Clone, ValueEnum)]
+#[derive(Clone, ValueEnum, PartialEq, Debug, Eq)]
 pub enum Period {
     /// Leads to a YYYYMMDD subdir
     Daily,
@@ -130,15 +130,172 @@ mod tests {
 
     extern crate tempfile;
 
+    use chrono::Local;
+    use std::collections::HashMap;
+    use std::env;
     use std::fs::{create_dir, read_to_string, File};
+    use std::fs::{create_dir_all, remove_dir_all};
     use std::io::Write;
     use std::path::Path;
+    use std::time::Instant;
     use tempfile::tempdir;
 
     use super::super::*;
     use super::*;
     use crate::scheduler::job::JobInfo;
     use crate::scheduler::slurm::SlurmJobEntry;
+
+    #[test]
+    fn test_file_archive_new() {
+        let archive_path = PathBuf::from("/tmp/archive");
+        let period = Period::Daily;
+
+        let file_archive = FileArchive::new(&archive_path, &period);
+
+        assert_eq!(file_archive.archive_path, archive_path);
+        assert_eq!(file_archive.period, period);
+    }
+
+    #[test]
+    fn test_file_archive_build_existing_directory() {
+        let temp_dir = tempdir().unwrap();
+        let archive_path = temp_dir.path().to_owned();
+        let period = Period::Monthly;
+
+        let args = FileArgs {
+            archive: archive_path.clone(),
+            period: period.clone(),
+        };
+
+        let file_archive = FileArchive::build(&args).unwrap();
+
+        assert_eq!(file_archive.archive_path, archive_path);
+        assert_eq!(file_archive.period, period);
+    }
+
+    #[test]
+    fn test_file_archive_build_nonexistent_directory() {
+        let temp_dir = tempdir().unwrap();
+        let archive_path = temp_dir.path().join("nonexistent").to_owned();
+        let period = Period::Yearly;
+
+        let args = FileArgs {
+            archive: archive_path.clone(),
+            period: period.clone(),
+        };
+
+        let file_archive = FileArchive::build(&args).unwrap();
+
+        assert_eq!(file_archive.archive_path, archive_path);
+        assert_eq!(file_archive.period, period);
+    }
+
+    #[derive(Debug)]
+    struct DummyJobInfo {
+        job_id: String,
+        moment: Instant,
+        cluster: String,
+        files: Vec<(String, Vec<u8>)>,
+        script: String,
+        extra_info: Option<HashMap<String, String>>,
+    }
+
+    impl DummyJobInfo {
+        fn new(job_id: &str, moment: Instant, cluster: &str) -> Self {
+            DummyJobInfo {
+                job_id: job_id.to_string(),
+                moment,
+                cluster: cluster.to_string(),
+                files: vec![("file1.txt".to_string(), b"contents1".to_vec()), ("file2.txt".to_string(), b"contents2".to_vec())],
+                script: "echo 'Hello, World!'".to_string(),
+                extra_info: Some(HashMap::new()),
+            }
+        }
+    }
+
+    impl super::JobInfo for DummyJobInfo {
+        fn jobid(&self) -> String {
+            self.job_id.clone()
+        }
+
+        fn moment(&self) -> Instant {
+            self.moment
+        }
+
+        fn cluster(&self) -> String {
+            self.cluster.clone()
+        }
+
+        fn read_job_info(&mut self) -> Result<(), std::io::Error> {
+            // Implementation for reading job info goes here...
+            Ok(())
+        }
+
+        fn files(&self) -> Vec<(String, Vec<u8>)> {
+            self.files.clone()
+        }
+
+        fn script(&self) -> String {
+            self.script.clone()
+        }
+
+        fn extra_info(&self) -> Option<HashMap<String, String>> {
+            self.extra_info.clone()
+        }
+    }
+
+    #[test]
+    fn test_dummy_job_info_creation() {
+        let job_id = "123";
+        let moment = Instant::now();
+        let cluster = "test_cluster";
+
+        let dummy_job_info = DummyJobInfo::new(job_id, moment, cluster);
+
+        assert_eq!(dummy_job_info.jobid(), job_id);
+        assert_eq!(dummy_job_info.moment(), moment);
+        assert_eq!(dummy_job_info.cluster(), cluster);
+        assert_eq!(dummy_job_info.files(), vec![("file1.txt".to_string(), b"contents1".to_vec()), ("file2.txt".to_string(), b"contents2".to_vec())]);
+        assert_eq!(dummy_job_info.script(), "echo 'Hello, World!'");
+        assert_eq!(dummy_job_info.extra_info(), Some(HashMap::new()));
+    }
+
+    #[test]
+    fn test_dummy_job_info_read_job_info() {
+        let mut dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster");
+        let result = dummy_job_info.read_job_info();
+        assert!(result.is_ok()); // Placeholder test, assuming read_job_info always succeeds
+    }
+
+    #[test]
+    fn test_dummy_job_info_files() {
+        let dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster");
+        let files = dummy_job_info.files();
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0].0, "file1.txt");
+        assert_eq!(files[1].0, "file2.txt");
+    }
+
+    #[test]
+    fn test_file_archive_archive() {
+        let temp_dir = tempdir().unwrap();
+        let archive_path = temp_dir.path().to_owned();
+        let period = Period::Daily;
+        let job_info: Box<dyn JobInfo + 'static> = Box::new(DummyJobInfo::new("123", Instant::now(), "test_cluster"));
+
+        let file_archive = FileArchive::new(&archive_path, &period);
+        file_archive.archive(&job_info).unwrap();
+
+        for (fname, fcontents) in job_info.files().iter() {
+            let file_path = archive_path.join(format!("{}", Local::now().format("%Y%m%d"))).join(fname);
+            assert!(file_path.exists());
+            let read_contents = std::fs::read(&file_path).unwrap();
+            assert_eq!(&read_contents[..], &fcontents[..]);
+        }
+
+        // Clean up
+        remove_dir_all(&archive_path).unwrap();
+    }
 
     #[test]
     fn test_determine_target_path() {
@@ -166,6 +323,50 @@ mod tests {
         let p = Period::Daily;
         let target_path = determine_target_path(&archive_dir, &p);
         assert_eq!(target_path, archive_dir.join(d));
+    }
+
+
+    #[test]
+    fn test_determine_target_path_yearly() {
+        let temp_dir = env::temp_dir();
+        let target_path = determine_target_path(&temp_dir, &Period::Yearly);
+        assert_eq!(
+            target_path,
+            temp_dir.join(&format!("{}", Local::now().format("%Y")))
+        );
+        assert!(target_path.exists());
+        remove_dir_all(&target_path).unwrap();
+    }
+
+    #[test]
+    fn test_determine_target_path_monthly() {
+        let temp_dir = env::temp_dir();
+        let target_path = determine_target_path(&temp_dir, &Period::Monthly);
+        assert_eq!(
+            target_path,
+            temp_dir.join(&format!("{}", Local::now().format("%Y%m")))
+        );
+        assert!(target_path.exists());
+        remove_dir_all(&target_path).unwrap();
+    }
+
+        #[test]
+    fn test_determine_target_path_daily() {
+        let temp_dir = env::temp_dir();
+        let target_path = determine_target_path(&temp_dir, &Period::Daily);
+        assert_eq!(
+            target_path,
+            temp_dir.join(&format!("{}", Local::now().format("%Y%m%d")))
+        );
+        assert!(target_path.exists());
+        remove_dir_all(&target_path).unwrap();
+    }
+
+    #[test]
+    fn test_determine_target_path_none() {
+        let temp_dir = env::temp_dir();
+        let target_path = determine_target_path(&temp_dir, &Period::None);
+        assert_eq!(target_path, temp_dir);
     }
 
     #[test]
