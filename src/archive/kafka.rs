@@ -224,7 +224,6 @@ mod tests {
     use serde_json::json;
     use std::collections::HashMap;
     use std::time::Duration;
-    use tokio;
 
     use super::super::*;
     use super::*;
