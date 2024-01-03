@@ -252,7 +252,10 @@ mod tests {
         }
 
         fn files(&self) -> Vec<(String, Vec<u8>)> {
-            vec![("file1.txt".to_string(), b"contents1".to_vec()), ("file2.txt".to_string(), b"contents2".to_vec())]
+            vec![
+                ("file1.txt".to_string(), b"contents1".to_vec()),
+                ("file2.txt".to_string(), b"contents2".to_vec()),
+            ]
         }
 
         fn script(&self) -> String {
@@ -277,8 +280,14 @@ mod tests {
         let ssl = None;
         let sasl = None;
 
-        let kafka_archive =
-            KafkaArchive::new(&brokers, &topic, &message_timeout, &security_protocol, &ssl, &sasl);
+        let kafka_archive = KafkaArchive::new(
+            &brokers,
+            &topic,
+            &message_timeout,
+            &security_protocol,
+            &ssl,
+            &sasl,
+        );
 
         // Assert that the KafkaArchive was created successfully
         assert_eq!(kafka_archive.topic, topic);
@@ -311,9 +320,4 @@ mod tests {
         // Assert that the KafkaArchive was built successfully
         assert_eq!(kafka_archive.topic, topic);
     }
-
-
 }
-
-
-

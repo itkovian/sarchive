@@ -206,7 +206,10 @@ mod tests {
                 job_id: job_id.to_string(),
                 moment,
                 cluster: cluster.to_string(),
-                files: vec![("file1.txt".to_string(), b"contents1".to_vec()), ("file2.txt".to_string(), b"contents2".to_vec())],
+                files: vec![
+                    ("file1.txt".to_string(), b"contents1".to_vec()),
+                    ("file2.txt".to_string(), b"contents2".to_vec()),
+                ],
                 script: "echo 'Hello, World!'".to_string(),
                 extra_info: Some(HashMap::new()),
             }
@@ -255,7 +258,13 @@ mod tests {
         assert_eq!(dummy_job_info.jobid(), job_id);
         assert_eq!(dummy_job_info.moment(), moment);
         assert_eq!(dummy_job_info.cluster(), cluster);
-        assert_eq!(dummy_job_info.files(), vec![("file1.txt".to_string(), b"contents1".to_vec()), ("file2.txt".to_string(), b"contents2".to_vec())]);
+        assert_eq!(
+            dummy_job_info.files(),
+            vec![
+                ("file1.txt".to_string(), b"contents1".to_vec()),
+                ("file2.txt".to_string(), b"contents2".to_vec())
+            ]
+        );
         assert_eq!(dummy_job_info.script(), "echo 'Hello, World!'");
         assert_eq!(dummy_job_info.extra_info(), Some(HashMap::new()));
     }
@@ -281,13 +290,16 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let archive_path = temp_dir.path().to_owned();
         let period = Period::Daily;
-        let job_info: Box<dyn JobInfo + 'static> = Box::new(DummyJobInfo::new("123", Instant::now(), "test_cluster"));
+        let job_info: Box<dyn JobInfo + 'static> =
+            Box::new(DummyJobInfo::new("123", Instant::now(), "test_cluster"));
 
         let file_archive = FileArchive::new(&archive_path, &period);
         file_archive.archive(&job_info).unwrap();
 
         for (fname, fcontents) in job_info.files().iter() {
-            let file_path = archive_path.join(format!("{}", Local::now().format("%Y%m%d"))).join(fname);
+            let file_path = archive_path
+                .join(format!("{}", Local::now().format("%Y%m%d")))
+                .join(fname);
             assert!(file_path.exists());
             let read_contents = std::fs::read(&file_path).unwrap();
             assert_eq!(&read_contents[..], &fcontents[..]);
@@ -325,7 +337,6 @@ mod tests {
         assert_eq!(target_path, archive_dir.join(d));
     }
 
-
     #[test]
     fn test_determine_target_path_yearly() {
         let temp_dir = env::temp_dir();
@@ -350,7 +361,7 @@ mod tests {
         remove_dir_all(&target_path).unwrap();
     }
 
-        #[test]
+    #[test]
     fn test_determine_target_path_daily() {
         let temp_dir = env::temp_dir();
         let target_path = determine_target_path(&temp_dir, &Period::Daily);
