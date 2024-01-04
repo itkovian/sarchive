@@ -101,4 +101,111 @@ pub fn monitor(
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+
+    use super::*;
+    use crossbeam_channel::unbounded;
+    use notify::event::{CreateKind, Event, EventKind};
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::time::{Duration, Instant};
+    use tempfile::tempdir;
+
+    struct DummyScheduler;
+
+    impl Scheduler for DummyScheduler {
+        fn watch_locations(&self) -> Vec<PathBuf> {
+            // For the purpose of the test, return a single dummy watch location
+            vec!["dummy_watch_location".into()]
+        }
+
+        fn create_job_info(&self, _event_path: &Path) -> Option<Box<dyn JobInfo>> {
+            // For the purpose of the test, return a dummy JobInfo instance
+            Some(Box::new(DummyJobInfo))
+        }
+
+        fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>> {
+            if let Event {
+                kind: EventKind::Create(CreateKind::File),
+                ..
+            } = event {
+                Some(vec![event.paths[0].clone()])
+            } else {
+                None
+            }
+        }
+    }
+
+    struct DummyJobInfo;
+
+    impl JobInfo for DummyJobInfo {
+        fn jobid(&self) -> String {
+            "dummy_job".to_string()
+        }
+
+        fn moment(&self) -> Instant {
+            Instant::now()
+        }
+
+        fn cluster(&self) -> String {
+            "dummy_cluster".to_string()
+        }
+
+        fn read_job_info(&mut self) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn files(&self) -> Vec<(String, Vec<u8>)> {
+            vec![]
+        }
+
+        fn script(&self) -> String {
+            "dummy_script".to_string()
+        }
+
+        fn extra_info(&self) -> Option<HashMap<String, String>> {
+            Some(HashMap::new())
+        }
+    }
+
+    #[test]
+    fn test_monitor() {
+        // Setup: Create a temporary directory
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_owned();
+        let temp_dir_path_clone = temp_dir_path.clone();
+
+        // Setup: Create a sender and receiver channels
+        let (tx, rx) = unbounded();
+        let (sig_tx, sig_rx) = unbounded();
+
+        // Setup: Create a dummy scheduler
+        let scheduler : Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
+
+        // Test: Spawn a thread for the monitor function
+        let monitor_thread = std::thread::spawn(move || {
+            monitor(&scheduler, &temp_dir_path_clone, &tx, &sig_rx).expect("Monitor function failed");
+        });
+
+        // Introduce a delay to allow the monitor thread to start watching
+        std::thread::sleep(Duration::from_millis(1000));
+
+        // Test: Create a dummy file in the temporary directory
+        let dummy_file_path = temp_dir_path.join("dummy_file.txt");
+        std::fs::write(&dummy_file_path, "dummy_content").expect("Failed to create dummy file");
+
+        // Introduce a delay to allow the monitor thread to detect the file event
+        std::thread::sleep(Duration::from_millis(100));
+
+        // Assert: Check if a JobInfo instance has been sent through the channel
+        let job_info = rx.try_recv().expect("No JobInfo received");
+        assert_eq!(job_info.jobid(), "dummy_job");
+
+        // Signal the monitor thread to stop
+        sig_tx.send(true).expect("Failed to send signal to stop the monitor thread");
+
+        // Wait for the monitor thread to finish
+        monitor_thread.join().expect("Failed to join monitor thread");
+    }
+
+}
