@@ -208,4 +208,35 @@ mod tests {
         monitor_thread.join().expect("Failed to join monitor thread");
     }
 
+    #[test]
+    fn test_check_and_queue() {
+        // Setup: Create a temporary directory
+        let temp_dir = tempdir().unwrap();
+        let temp_dir_path = temp_dir.path().to_owned();
+
+        // Setup: Create a sender and receiver channels
+        let (tx, rx) = unbounded();
+
+        // Setup: Create a dummy scheduler
+        let scheduler : Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
+
+        // Test: Create a dummy file in the temporary directory
+        let dummy_file_path = temp_dir_path.join("dummy_file.txt");
+        std::fs::write(&dummy_file_path, "dummy_content").expect("Failed to create dummy file");
+
+        // Test: Create a dummy event for the created file
+        let dummy_event = Event {
+            kind: EventKind::Create(CreateKind::File),
+            paths: vec![dummy_file_path.clone()],
+            ..Default::default()
+        };
+
+        // Test: Call check_and_queue function
+        let result = check_and_queue(&scheduler, &tx, dummy_event);
+
+        // Assert: Check the result and verify if JobInfo was sent through the channel
+        assert!(result.is_ok());
+        let job_info = rx.try_recv().expect("No JobInfo received");
+        assert_eq!(job_info.jobid(), "dummy_job");
+    }
 }
