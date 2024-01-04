@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2024 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -133,8 +133,7 @@ mod tests {
     use chrono::Local;
     use std::collections::HashMap;
     use std::env;
-    use std::fs::{create_dir, read_to_string, File};
-    use std::fs::{create_dir_all, remove_dir_all};
+    use std::fs::{create_dir, read_to_string, remove_dir_all, File};
     use std::io::Write;
     use std::path::Path;
     use std::time::Instant;

@@ -1,5 +1,5 @@
 /*
-Copyright 2019 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2024 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -220,15 +220,11 @@ impl Archive for KafkaArchive {
 #[cfg(test)]
 mod tests {
 
-    use mockito::{Mock, Server};
-    use serde_json::json;
+    use mockito::Server;
     use std::collections::HashMap;
-    use std::time::Duration;
 
-    use super::super::*;
     use super::*;
     use crate::scheduler::job::JobInfo;
-    use crate::scheduler::slurm::SlurmJobEntry;
 
     #[derive(Debug)]
     struct DummyJobInfo;
