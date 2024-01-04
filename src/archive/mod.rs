@@ -1,5 +1,5 @@
 /*
-Copyright 2019-2020 Andy Georges <itkovian+sarchive@gmail.com>
+Copyright 2019-2024 Andy Georges <itkovian+sarchive@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -140,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    fn test_process() {
+    fn test_process_cleanup() {
         let (tx1, rx1) = unbounded();
         let (tx2, rx2) = unbounded();
         let archiver = Box::new(DummyArchiver);
