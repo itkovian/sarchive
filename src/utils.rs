@@ -139,7 +139,10 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
-            format!("File \"{}/nonexistent_file.txt\" did not appear after waiting 1s", temp_dir.path().display())
+            format!(
+                "File \"{}/nonexistent_file.txt\" did not appear after waiting 1s",
+                temp_dir.path().display()
+            )
         );
     }
 
@@ -151,7 +154,7 @@ mod tests {
 
         // Test: Register a mock signal handler and trigger the signal
         register_signal_handler(1, &unparker.unparker(), &notification);
-        
+
         // Introduce a delay to allow the signal handler to register
         std::thread::sleep(Duration::from_millis(100));
 
@@ -194,5 +197,4 @@ mod tests {
         // Assert that at least one notification has been received
         assert!(receiver.try_iter().count() == 20);
     }
-
 }

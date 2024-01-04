@@ -128,7 +128,8 @@ mod tests {
             if let Event {
                 kind: EventKind::Create(CreateKind::File),
                 ..
-            } = event {
+            } = event
+            {
                 Some(vec![event.paths[0].clone()])
             } else {
                 None
@@ -180,11 +181,12 @@ mod tests {
         let (sig_tx, sig_rx) = unbounded();
 
         // Setup: Create a dummy scheduler
-        let scheduler : Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
+        let scheduler: Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
 
         // Test: Spawn a thread for the monitor function
         let monitor_thread = std::thread::spawn(move || {
-            monitor(&scheduler, &temp_dir_path_clone, &tx, &sig_rx).expect("Monitor function failed");
+            monitor(&scheduler, &temp_dir_path_clone, &tx, &sig_rx)
+                .expect("Monitor function failed");
         });
 
         // Introduce a delay to allow the monitor thread to start watching
@@ -202,10 +204,14 @@ mod tests {
         assert_eq!(job_info.jobid(), "dummy_job");
 
         // Signal the monitor thread to stop
-        sig_tx.send(true).expect("Failed to send signal to stop the monitor thread");
+        sig_tx
+            .send(true)
+            .expect("Failed to send signal to stop the monitor thread");
 
         // Wait for the monitor thread to finish
-        monitor_thread.join().expect("Failed to join monitor thread");
+        monitor_thread
+            .join()
+            .expect("Failed to join monitor thread");
     }
 
     #[test]
@@ -218,7 +224,7 @@ mod tests {
         let (tx, rx) = unbounded();
 
         // Setup: Create a dummy scheduler
-        let scheduler : Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
+        let scheduler: Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
 
         // Test: Create a dummy file in the temporary directory
         let dummy_file_path = temp_dir_path.join("dummy_file.txt");

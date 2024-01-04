@@ -54,8 +54,8 @@ pub trait JobInfo: Send {
 mod tests {
 
     use std::collections::HashMap;
-    use std::time::{Instant, Duration};
     use std::thread::sleep;
+    use std::time::{Duration, Instant};
 
     use super::*;
 
@@ -70,7 +70,12 @@ mod tests {
     }
 
     impl DummyJobInfo {
-        fn new(job_id: &str, cluster: &str, script: &str, extra_info: Option<HashMap<String, String>>) -> Self {
+        fn new(
+            job_id: &str,
+            cluster: &str,
+            script: &str,
+            extra_info: Option<HashMap<String, String>>,
+        ) -> Self {
             DummyJobInfo {
                 job_id: job_id.to_string(),
                 moment: Instant::now(),
@@ -173,5 +178,3 @@ mod tests {
         assert_eq!(job_info.extra_info(), Some(extra_info));
     }
 }
-
-
