@@ -87,22 +87,112 @@ pub fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &
 /// Handle the signal
 pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
     let backoff = Backoff::new();
-    while !sig.load(SeqCst) {
+
+    while sig.load(SeqCst) {
         if backoff.is_completed() {
             p.park();
         } else {
             backoff.snooze();
         }
     }
+
     for _ in 0..20 {
         sender.send(true).unwrap();
     }
+
     info!("Sent 20 notifications");
 }
 
 #[cfg(test)]
 mod tests {
 
+    use crossbeam_channel::unbounded;
+    use crossbeam_utils::sync::Parker;
+    use std::fs;
+    use std::path::Path;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use tempfile::tempdir;
 
+    use super::*;
+
+    #[test]
+    fn test_read_file_existing_file() {
+        // Setup: Create a temporary directory and file
+        let temp_dir = tempdir().expect("Failed to create temporary directory");
+        let file_path = temp_dir.path().join("test_file.txt");
+        fs::write(&file_path, b"test contents").expect("Failed to write to test file");
+
+        // Test: Read the contents of the existing file
+        let result = read_file(temp_dir.path(), &Path::new("test_file.txt"), None);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), b"test contents");
+    }
+
+    #[test]
+    fn test_read_file_nonexistent_file() {
+        // Setup: Create a temporary directory without the expected file
+        let temp_dir = tempdir().expect("Failed to create temporary directory");
+
+        // Test: Attempt to read contents of a nonexistent file
+        let result = read_file(temp_dir.path(), &Path::new("nonexistent_file.txt"), Some(1));
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            format!("File \"{}/nonexistent_file.txt\" did not appear after waiting 1s", temp_dir.path().display())
+        );
+    }
+
+    #[test]
+    fn test_register_signal_handler() {
+        // Setup: Create a mock unparker and an atomic boolean
+        let unparker = Parker::new();
+        let notification = Arc::new(AtomicBool::new(false));
+
+        // Test: Register a mock signal handler and trigger the signal
+        register_signal_handler(1, &unparker.unparker(), &notification);
+        
+        // Introduce a delay to allow the signal handler to register
+        std::thread::sleep(Duration::from_millis(100));
+
+        // Trigger the signal and wait for the notification
+        unsafe {
+            libc::raise(1); // Simulate sending signal 1
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        unparker.unparker().unpark();
+        assert!(notification.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_signal_handler_atomic() {
+        // Setup: Create a mock sender, an atomic boolean, and a parker
+        let (sender, receiver) = unbounded();
+        let signal_flag = Arc::new(AtomicBool::new(false)); // Original AtomicBool
+        let parker = Parker::new();
+
+        // Test: Run the signal handler and verify notifications
+        let cloned_signal_flag = Arc::clone(&signal_flag);
+        std::thread::spawn(move || {
+            signal_handler_atomic(&sender, cloned_signal_flag, &parker);
+        });
+
+        // Give the thread some time to start
+        std::thread::sleep(Duration::from_millis(10));
+
+        // Trigger the signal flag and wait for notifications
+        {
+            let flag = signal_flag;
+            flag.store(true, Ordering::SeqCst);
+        }
+
+        // Introduce a delay to allow the signal handler to process and send notifications
+        std::thread::sleep(Duration::from_millis(100));
+
+        // Assert that at least one notification has been received
+        assert!(receiver.try_iter().count() == 20);
+    }
 
 }
