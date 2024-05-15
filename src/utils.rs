@@ -88,7 +88,7 @@ pub fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &
 pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Parker) {
     let backoff = Backoff::new();
 
-    while sig.load(SeqCst) {
+    while !sig.load(SeqCst) {
         if backoff.is_completed() {
             p.park();
         } else {
