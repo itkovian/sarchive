@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.12.8"
+version = "0.12.9"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2021"
 description = "Archival tool for slurm job scripts"
@@ -18,7 +18,7 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 chrono = { version = "~0.4", default-features = false, features = ["clock", "serde"] }
-clap = { version = "~4.4", features = ["derive"] }
+clap = { version = "~4.5", features = ["derive"] }
 crossbeam = "~0.8"
 crossbeam-channel = "~0.5"
 crossbeam-queue = "~0.3"
@@ -51,7 +51,7 @@ path = "src/main.rs"
 kafka = ["rdkafka", "serde", "serde_derive", "serde_json"]
 
 [dev-dependencies]
-tempfile = "~3.9"
+tempfile = "~3.10"
 tokio = "1.35.1"
 mockito = "1.2.0"
 
