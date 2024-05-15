@@ -106,7 +106,8 @@ pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Pa
 #[cfg(test)]
 mod tests {
 
-    use crossbeam_channel::unbounded;
+    use crossbeam::channel::{Receiver, Sender};
+    use crossbeam_channel::bounded;
     use crossbeam_utils::sync::Parker;
     use std::fs;
     use std::path::Path;
@@ -171,30 +172,35 @@ mod tests {
 
     #[test]
     fn test_signal_handler_atomic() {
-        // Setup: Create a mock sender, an atomic boolean, and a parker
-        let (sender, receiver) = unbounded();
-        let signal_flag = Arc::new(AtomicBool::new(false)); // Original AtomicBool
+        // Create the necessary components for the function
+        let (sender, receiver): (Sender<bool>, Receiver<bool>) = bounded(20);
+        let sig = Arc::new(AtomicBool::new(false));
         let parker = Parker::new();
+        let unparker = parker.unparker().clone();
 
-        // Test: Run the signal handler and verify notifications
-        let cloned_signal_flag = Arc::clone(&signal_flag);
-        std::thread::spawn(move || {
-            signal_handler_atomic(&sender, cloned_signal_flag, &parker);
+        // Clone sig and sender for the thread
+        let sig_clone = sig.clone();
+        let sender_clone = sender.clone();
+
+        // Spawn a thread to run the signal_handler_atomic function
+        let handle = std::thread::spawn(move || {
+            signal_handler_atomic(&sender_clone, sig_clone, &parker);
         });
 
-        // Give the thread some time to start
-        std::thread::sleep(Duration::from_millis(10));
+        // Simulate the signal being set to true
+        std::thread::sleep(std::time::Duration::from_millis(100)); // Ensure the thread starts and parks
+        sig.store(true, Ordering::SeqCst);
+        unparker.unpark();
 
-        // Trigger the signal flag and wait for notifications
-        {
-            let flag = signal_flag;
-            flag.store(true, Ordering::SeqCst);
+        // Wait for the thread to finish
+        handle.join().unwrap();
+
+        // Verify that the sender sent the correct number of messages
+        let mut count = 0;
+        while let Ok(_) = receiver.try_recv() {
+            count += 1;
         }
 
-        // Introduce a delay to allow the signal handler to process and send notifications
-        std::thread::sleep(Duration::from_millis(100));
-
-        // Assert that at least one notification has been received
-        assert!(receiver.try_iter().count() == 20);
+        assert_eq!(count, 20, "Expected 20 messages to be sent");
     }
 }
