@@ -19,9 +19,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use clap::Args;
 use log::debug;
 use notify::event::{CreateKind, Event, EventKind};
+use regex::Regex;
 use std::collections::HashMap;
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -31,9 +31,6 @@ use std::time::Instant;
 use super::job::JobInfo;
 use super::Scheduler;
 use crate::utils;
-
-#[derive(Args)]
-pub struct SlurmArgs {}
 
 /// Representation of an entry in the Slurm job spool hash directories
 pub struct SlurmJobEntry {
@@ -49,6 +46,8 @@ pub struct SlurmJobEntry {
     script_: Option<Vec<u8>>,
     /// The job's environment in Slurm
     env_: Option<Vec<u8>>,
+    /// Filter for the environment
+    filter_regex: Option<String>,
 }
 
 impl SlurmJobEntry {
@@ -69,11 +68,16 @@ impl SlurmJobEntry {
     /// let id = "1234";
     /// let cluster = "mycluster";
     ///
-    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster);
+    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster, &None);
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
-    pub fn new(path: &Path, id: &str, cluster: &str) -> SlurmJobEntry {
+    pub fn new(
+        path: &Path,
+        id: &str,
+        cluster: &str,
+        filter_regex: &Option<String>,
+    ) -> SlurmJobEntry {
         SlurmJobEntry {
             path_: path.to_path_buf(),
             jobid_: id.to_string(),
@@ -81,8 +85,21 @@ impl SlurmJobEntry {
             moment_: Instant::now(),
             script_: None,
             env_: None,
+            filter_regex: filter_regex.clone(),
         }
     }
+}
+
+fn filter_env(r: &Option<String>, env: &str) -> bool {
+    // Hardcoded for now.
+    if let Some(rs) = r {
+        let rs = Regex::new(rs).unwrap();
+        if rs.is_match(env) {
+            return true;
+        }
+        return false;
+    }
+    false
 }
 
 impl JobInfo for SlurmJobEntry {
@@ -145,22 +162,27 @@ impl JobInfo for SlurmJobEntry {
     /// Returns the environment info (if any) as a HashMap, mapping env keys
     /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
+        let r = self.filter_regex.clone();
         self.env_.as_ref().map(|s| {
-            let s = String::from_utf8_lossy(s.split_at(4).1).to_string();
-            s.split('\0')
-                .filter_map(|s| {
-                    let s = s.trim();
-                    if !s.is_empty() {
-                        let ps: Vec<_> = s.split('=').collect();
-                        match ps.len() {
+            let env_string = String::from_utf8_lossy(s.split_at(4).1).to_string();
+            env_string
+                .split('\0')
+                .filter_map(|entry| {
+                    let entry = entry.trim();
+                    if !entry.is_empty() {
+                        let parts: Vec<_> = entry.split('=').collect();
+                        match parts.len() {
                             2 => {
-                                if !ps[0].trim().is_empty() {
-                                    Some((ps[0].to_owned(), ps[1].to_owned()))
+                                let key = parts[0].trim();
+                                println!("Checking for key {}", &key);
+                                if !key.is_empty() && !filter_env(&r, key) {
+                                    println!("Keeping key {}", &key);
+                                    Some((key.to_owned(), parts[1].to_owned()))
                                 } else {
                                     None
                                 }
                             }
-                            _ => Some((s.to_owned(), String::from(""))),
+                            _ => Some((entry.to_owned(), String::from(""))),
                         }
                     } else {
                         None
@@ -176,31 +198,38 @@ pub struct Slurm {
     /// The absolute path to the spool directory
     pub base: PathBuf,
     pub cluster: String,
+    pub filter_regex: Option<String>,
 }
 
 impl Slurm {
-    /// Returns a new Slurm with the base path set.
+    /// Returns a new `Slurm` with the specified base path, cluster, and arguments.
     ///
     /// # Arguments
     ///
-    /// * `base`: a PathBuf reference
+    /// * `base` - A reference to a `Path` representing the base path.
+    /// * `cluster` - A string slice representing the name of the cluster.
+    /// * `args` - A reference to `SlurmArgs` containing additional arguments.
     ///
     /// # Example
     ///
     /// ```
     /// # use std::path::PathBuf;
-    /// # use sarchive::scheduler::slurm::Slurm;
+    /// # use sarchive::scheduler::slurm::{Slurm};
     ///
     /// let base = PathBuf::from("/var/spool/slurm/hash.3/5678");
     ///
-    /// let slurm = Slurm::new(&base, "mycluster");
+    /// let slurm = Slurm::new(&base, "mycluster", &Some(".*".to_string()));
     ///
     /// assert_eq!(slurm.base, base);
+    /// assert_eq!(slurm.cluster, "mycluster");
+    /// assert_eq!(slurm.filter_regex, Some(".*".to_string()));
     /// ```
-    pub fn new(base: &Path, cluster: &str) -> Slurm {
+    ///
+    pub fn new(base: &Path, cluster: &str, filter_regex: &Option<String>) -> Slurm {
         Slurm {
             base: base.to_path_buf(),
             cluster: cluster.to_string(),
+            filter_regex: filter_regex.clone(),
         }
     }
 }
@@ -231,6 +260,7 @@ impl Scheduler for Slurm {
                 event_path,
                 jobid,
                 &self.cluster,
+                &self.filter_regex,
             )))
         } else {
             None
@@ -300,7 +330,7 @@ mod tests {
     #[test]
     fn test_read_job_script_drop_zero() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", &None);
         slurm_job_entry.read_job_info().unwrap();
 
         // check the script
@@ -311,11 +341,12 @@ mod tests {
     #[test]
     fn test_read_job_extra_info() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", &None);
         slurm_job_entry.read_job_info().unwrap();
 
         // check the environment information
         if let Some(hm) = slurm_job_entry.extra_info() {
+            println!("hm length: {}", hm.len());
             assert_eq!(hm.len(), 45);
             assert_eq!(hm.get("SLURM_CLUSTERS").unwrap(), "cluster");
             assert_eq!(hm.get("SLURM_NTASKS_PER_NODE").unwrap(), "1");
@@ -327,7 +358,7 @@ mod tests {
     #[test]
     fn test_extra_info_drop_u32_prefix() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.8897161"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster");
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster", &None);
         if let Err(e) = slurm_job_entry.read_job_info() {
             println!("Could not read job info: {:?}", e);
             assert!(false);
@@ -337,5 +368,43 @@ mod tests {
         } else {
             assert!(false);
         }
+    }
+
+    #[test]
+    fn test_extra_info() {
+        let env_data = b"\0\0\0\0VAR1=value1\0VAR2=value2\0VAR3=value3\0";
+        let filter_regex = Some("VAR2".to_string());
+
+        let job_entry = SlurmJobEntry {
+            path_: PathBuf::from("/some/path"),
+            jobid_: "12345".to_string(),
+            cluster_: "mycluster".to_string(),
+            moment_: Instant::now(),
+            script_: None,
+            env_: Some(env_data.to_vec()),
+            filter_regex,
+        };
+
+        let extra_info = job_entry.extra_info().unwrap();
+
+        assert_eq!(extra_info.get("VAR1"), Some(&"value1".to_string()));
+        assert_eq!(extra_info.get("VAR2"), None);
+        assert_eq!(extra_info.get("VAR3"), Some(&"value3".to_string()));
+    }
+
+    #[test]
+    fn test_filter_env() {
+        let regex = Some("VAR.*".to_string());
+        assert!(filter_env(&regex, "VAR1"));
+        assert!(filter_env(&regex, "VAR2"));
+        assert!(!filter_env(&regex, "OTHER"));
+    }
+
+    #[test]
+    fn test_filter_env_none() {
+        let regex = None;
+        assert!(!filter_env(&regex, "VAR1"));
+        assert!(!filter_env(&regex, "VAR2"));
+        assert!(!filter_env(&regex, "OTHER"));
     }
 }

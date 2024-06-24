@@ -63,7 +63,7 @@ wish to keep around, but probably no longer immediately need for user support.
 
 For example,
 
-`sarchive --cluster huppel -s /var/spool/slurm file --archive /var/backups/slurm/job-archive`
+`sarchive --cluster huppel -s /var/spool/slurm file --archive=/var/backups/slurm/job-archive`
 
 ### Elasticsearch archival (removed)
 
@@ -101,4 +101,3 @@ We provide a build script to generate an RPM using the cargo-rpm tool. You may t
 file (listed under the `.rpm` directory) to fit your needs. The RPM includes a unit file so
 `sarchive` can be started as a service by systemd. This file should also be changed to fit your
 requirements and local configuration.
-
