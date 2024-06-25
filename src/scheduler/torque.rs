@@ -33,7 +33,8 @@ use super::Scheduler;
 
 use crate::utils;
 
-#[derive(Args)]
+/// Arguments for the Torque scheduler command
+#[derive(Args, Debug)]
 pub struct TorqueArgs {
     subdirs: bool,
 }

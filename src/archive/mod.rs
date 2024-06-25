@@ -25,7 +25,7 @@ pub mod file;
 #[cfg(feature = "kafka")]
 pub mod kafka;
 
-use clap::Subcommand;
+use clap::{command, Args, Subcommand};
 use crossbeam_channel::{select, Receiver};
 use log::{debug, error, info};
 use std::io::Error;
@@ -38,8 +38,14 @@ use file::{FileArchive, FileArgs};
 use std::thread::sleep;
 use std::time::Duration;
 
-#[derive(Subcommand)]
-pub enum Archiver {
+#[derive(Args, Debug)]
+pub struct ArchiverOptions {
+    #[command(subcommand)]
+    pub archiver: Option<ArchiverArgs>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ArchiverArgs {
     File(FileArgs),
 
     #[cfg(feature = "kafka")]
@@ -52,17 +58,18 @@ pub trait Archive: Send {
     fn archive(&self, slurm_job_entry: &Box<dyn JobInfo>) -> Result<(), Error>;
 }
 
-pub fn archive_builder(archiver: &Archiver) -> Result<Box<dyn Archive>, Error> {
+pub fn archive_builder(archiver: &Option<ArchiverArgs>) -> Result<Box<dyn Archive>, Error> {
     match archiver {
-        Archiver::File(args) => {
+        Some(ArchiverArgs::File(args)) => {
             let archive = FileArchive::build(args)?;
             Ok(Box::new(archive))
         }
         #[cfg(feature = "kafka")]
-        Archiver::Kafka(kafka_args) => {
+        Some(ArchiverArgs::Kafka(kafka_args)) => {
             let archive = KafkaArchive::build(kafka_args)?;
             Ok(Box::new(archive))
         }
+        None => panic!("No suitable archiver provided."),
     }
 }
 
@@ -147,7 +154,7 @@ mod tests {
 
         scope(|s| {
             let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-            let slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster");
+            let slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", &None);
             s.spawn(move |_| match process(archiver, &rx1, &rx2, false) {
                 Ok(v) => assert_eq!(v, ()),
                 Err(_) => panic!("Unexpected error from process function"),

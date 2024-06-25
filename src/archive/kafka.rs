@@ -34,7 +34,8 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{Error, ErrorKind};
 
-#[derive(Args)]
+/// Command line options for the kafka archiver subcommand
+#[derive(Args, Debug)]
 pub struct KafkaArgs {
     #[arg(long, help = "Comma-separated list of brokers")]
     brokers: String,
@@ -56,7 +57,7 @@ pub struct KafkaArgs {
 }
 
 #[allow(non_camel_case_types)]
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Display, ValueEnum)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Display, ValueEnum, Debug)]
 pub enum SecurityProtocol {
     Plaintext,
     Ssl,

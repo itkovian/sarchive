@@ -36,7 +36,7 @@ mod monitor;
 mod scheduler;
 mod utils;
 
-use archive::{archive_builder, process, Archive, Archiver};
+use archive::{archive_builder, process, Archive, ArchiverOptions};
 
 use monitor::monitor;
 use scheduler::{create, SchedulerKind};
@@ -98,11 +98,14 @@ struct Cli {
     #[arg(long)]
     spool: PathBuf,
 
-    #[arg(long)]
+    #[arg(long, required = true)]
     scheduler: SchedulerKind,
 
-    #[command(subcommand)]
-    archiver: Archiver,
+    #[arg(long)]
+    filter_regex: Option<String>,
+
+    #[command(flatten)]
+    archiver: ArchiverOptions,
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -121,8 +124,8 @@ fn main() -> Result<(), std::io::Error> {
         exit(1);
     }
 
-    let scheduler_kind = cli.scheduler;
-    let archiver: Box<dyn Archive> = archive_builder(&cli.archiver).unwrap();
+    let scheduler = cli.scheduler;
+    let archiver: Box<dyn Archive> = archive_builder(&cli.archiver.archiver).unwrap();
     let cluster = cli.cluster;
 
     info!("sarchive starting. Watching spool {:?}.", &base);
@@ -139,7 +142,7 @@ fn main() -> Result<(), std::io::Error> {
 
     // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
-    let sched = create(&scheduler_kind, &base, &cluster);
+    let sched = create(&scheduler, &base, &cluster, &cli.filter_regex);
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {

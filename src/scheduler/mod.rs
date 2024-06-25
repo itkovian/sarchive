@@ -24,26 +24,16 @@ pub mod job;
 pub mod slurm;
 pub mod torque;
 
-use clap::{Subcommand, ValueEnum};
+use clap::ValueEnum;
 use notify::event::Event;
 use std::path::{Path, PathBuf};
 
 use job::JobInfo;
-use slurm::SlurmArgs;
-use torque::TorqueArgs;
 
-/// Denotes the schedulers SArchive supports
-// FIXME: this is a bit redundant, given the subcommands
-#[derive(Clone, ValueEnum)]
+#[derive(ValueEnum, Clone, Debug)]
 pub enum SchedulerKind {
     Slurm,
     Torque,
-}
-
-#[derive(Subcommand)]
-pub enum SchedArgs {
-    Slurm(SlurmArgs),
-    Torque(TorqueArgs),
 }
 
 pub trait Scheduler: Send + Sync {
@@ -52,9 +42,14 @@ pub trait Scheduler: Send + Sync {
     fn verify_event_kind(&self, event: &Event) -> Option<Vec<PathBuf>>;
 }
 
-pub fn create(kind: &SchedulerKind, spool_path: &Path, cluster: &str) -> Box<dyn Scheduler> {
-    match kind {
-        SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster)),
+pub fn create(
+    scheduler: &SchedulerKind,
+    spool_path: &Path,
+    cluster: &str,
+    filter_regex: &Option<String>,
+) -> Box<dyn Scheduler> {
+    match scheduler {
+        SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster, filter_regex)),
         SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path, cluster)),
     }
 }
