@@ -47,7 +47,7 @@ pub struct SlurmJobEntry {
     /// The job's environment in Slurm
     env_: Option<Vec<u8>>,
     /// Filter for the environment
-    filter_regex: Option<String>,
+    filter_regex: Option<Regex>,
 }
 
 impl SlurmJobEntry {
@@ -76,7 +76,7 @@ impl SlurmJobEntry {
         path: &Path,
         id: &str,
         cluster: &str,
-        filter_regex: &Option<String>,
+        filter_regex: &Option<Regex>,
     ) -> SlurmJobEntry {
         SlurmJobEntry {
             path_: path.to_path_buf(),
@@ -90,14 +90,11 @@ impl SlurmJobEntry {
     }
 }
 
-fn filter_env(r: &Option<String>, env: &str) -> bool {
-    // Hardcoded for now.
+fn filter_env(r: &Option<Regex>, env: &str) -> bool {
     if let Some(rs) = r {
-        let rs = Regex::new(rs).unwrap();
         if rs.is_match(env) {
             return true;
         }
-        return false;
     }
     false
 }
@@ -198,7 +195,7 @@ pub struct Slurm {
     /// The absolute path to the spool directory
     pub base: PathBuf,
     pub cluster: String,
-    pub filter_regex: Option<String>,
+    pub filter_regex: Option<Regex>,
 }
 
 impl Slurm {
@@ -213,19 +210,19 @@ impl Slurm {
     /// # Example
     ///
     /// ```
+    /// # use regex::Regex;
     /// # use std::path::PathBuf;
     /// # use sarchive::scheduler::slurm::{Slurm};
     ///
     /// let base = PathBuf::from("/var/spool/slurm/hash.3/5678");
     ///
-    /// let slurm = Slurm::new(&base, "mycluster", &Some(".*".to_string()));
+    /// let slurm = Slurm::new(&base, "mycluster", &Regex::new(".*").ok());
     ///
     /// assert_eq!(slurm.base, base);
     /// assert_eq!(slurm.cluster, "mycluster");
-    /// assert_eq!(slurm.filter_regex, Some(".*".to_string()));
     /// ```
     ///
-    pub fn new(base: &Path, cluster: &str, filter_regex: &Option<String>) -> Slurm {
+    pub fn new(base: &Path, cluster: &str, filter_regex: &Option<Regex>) -> Slurm {
         Slurm {
             base: base.to_path_buf(),
             cluster: cluster.to_string(),
@@ -373,7 +370,7 @@ mod tests {
     #[test]
     fn test_extra_info() {
         let env_data = b"\0\0\0\0VAR1=value1\0VAR2=value2\0VAR3=value3\0";
-        let filter_regex = Some("VAR2".to_string());
+        let filter_regex = Regex::new("VAR[12]").ok();
 
         let job_entry = SlurmJobEntry {
             path_: PathBuf::from("/some/path"),
@@ -387,14 +384,14 @@ mod tests {
 
         let extra_info = job_entry.extra_info().unwrap();
 
-        assert_eq!(extra_info.get("VAR1"), Some(&"value1".to_string()));
+        assert_eq!(extra_info.get("VAR1"), None);
         assert_eq!(extra_info.get("VAR2"), None);
         assert_eq!(extra_info.get("VAR3"), Some(&"value3".to_string()));
     }
 
     #[test]
     fn test_filter_env() {
-        let regex = Some("VAR.*".to_string());
+        let regex = Regex::new("VAR.*").ok();
         assert!(filter_env(&regex, "VAR1"));
         assert!(filter_env(&regex, "VAR2"));
         assert!(!filter_env(&regex, "OTHER"));
