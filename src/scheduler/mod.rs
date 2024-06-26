@@ -26,6 +26,7 @@ pub mod torque;
 
 use clap::ValueEnum;
 use notify::event::Event;
+use regex::Regex;
 use std::path::{Path, PathBuf};
 
 use job::JobInfo;
@@ -46,10 +47,10 @@ pub fn create(
     scheduler: &SchedulerKind,
     spool_path: &Path,
     cluster: &str,
-    filter_regex: &Option<String>,
+    filter_regex: &Option<Regex>,
 ) -> Box<dyn Scheduler> {
     match scheduler {
-        SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster, filter_regex)),
+        SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster, &filter_regex)),
         SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path, cluster)),
     }
 }

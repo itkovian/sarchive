@@ -26,6 +26,7 @@ use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
 use log::{error, info};
+use regex::Regex;
 use std::path::PathBuf;
 use std::process::exit;
 use std::sync::atomic::AtomicBool;
@@ -127,6 +128,11 @@ fn main() -> Result<(), std::io::Error> {
     let scheduler = cli.scheduler;
     let archiver: Box<dyn Archive> = archive_builder(&cli.archiver.archiver).unwrap();
     let cluster = cli.cluster;
+    let filter_regex = if let Some(r) = cli.filter_regex {
+        Regex::new(&r).ok()
+    } else {
+        None
+    };
 
     info!("sarchive starting. Watching spool {:?}.", &base);
 
@@ -142,7 +148,7 @@ fn main() -> Result<(), std::io::Error> {
 
     // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
-    let sched = create(&scheduler, &base, &cluster, &cli.filter_regex);
+    let sched = create(&scheduler, &base, &cluster, &filter_regex);
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {
