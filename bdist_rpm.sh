@@ -9,7 +9,8 @@ function test_and_exit() {
     fi
 }
 
-cargo install cargo-rpm
+cargo install cargo-generate-rpm
 
 cargo build --release --all-features; test_and_exit "stack build failed"
-cargo rpm build; test_and_exit "rpm creation failed"
+#strip -s ${CARGO_TARGET_DIR}/release/sarchive; test_and_exit "strip failed"
+cargo generate-rpm; test_and_exit "rpm creation failed"
