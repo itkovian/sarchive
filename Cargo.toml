@@ -52,7 +52,7 @@ path = "src/main.rs"
 kafka = ["rdkafka", "serde", "serde_derive", "serde_json"]
 
 [dev-dependencies]
-tempfile = "~3.12"
+tempfile = "~3.13"
 tokio = "1.35.1"
 mockito = "1.2.0"
 
