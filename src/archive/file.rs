@@ -29,7 +29,7 @@ use super::Archive;
 use crate::scheduler::job::JobInfo;
 
 /// Command line options for the file archiver subcommand
-#[derive(Args)]
+#[derive(Args, Debug)]
 pub struct FileArgs {
     archive: PathBuf,
     period: Period,
@@ -400,7 +400,7 @@ mod tests {
         let mut job = File::create(&job_path).unwrap();
         job.write(b"job script").unwrap();
 
-        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster");
+        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", &None);
         if let Err(_) = slurm_job_entry.read_job_info() {
             assert!(false);
         }
