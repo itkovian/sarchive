@@ -137,9 +137,17 @@ impl JobInfo for SlurmJobEntry {
     /// Returns a `Vector` with tuples containing the filename and the
     /// file contents for the script and environment files
     fn files(&self) -> Vec<(String, Vec<u8>)> {
+        let environment = self.extra_info().map(|m| {
+            m.iter()
+                .map(|(key, value)| format!("{}={}", key, value))
+                .collect::<Vec<String>>()
+                .join("\n")
+                .into_bytes()
+        });
+
         [
             ("script", self.script_.as_ref()),
-            ("environment", self.env_.as_ref()),
+            ("environment", environment.as_ref()),
         ]
         .iter()
         .filter_map(|(filename, v)| {
@@ -246,7 +254,7 @@ impl Scheduler for Slurm {
             .collect()
     }
 
-    /// Returns a Box wrapping the actual job info data structure.App
+    /// Returns a Box wrapping the actual job info data structure.
     ///
     /// # Arguments
     ///
