@@ -168,6 +168,8 @@ impl JobInfo for SlurmJobEntry {
     /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
         let r = self.filter_regex.clone();
+        debug!("Checking extra info");
+        info!("Checking extra info info");
         self.env_.as_ref().map(|s| {
             let env_string = String::from_utf8_lossy(s.split_at(4).1).to_string();
             env_string
