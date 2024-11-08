@@ -65,11 +65,8 @@ inherits = "release"
 debug = true
 split-debuginfo = "packed"
 
-[package.metadata.rpm.cargo]
-buildflags = ["--release", "--all-features"]
-
-[package.metadata.rpm.targets]
-sarchive = { path = "/usr/bin/sarchive" }
-
-[package.metadata.rpm.files]
-service = { path = "/usr/lib/systemd/system/sarchive.service" }
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/sarchive", dest = "/usr/bin/sarchive", mode = "755" },
+    { source = ".rpm/sarchive.service", dest = "/usr/lib/systemd/system/sarchive.service", mode = "644" },
+]
