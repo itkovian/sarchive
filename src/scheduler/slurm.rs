@@ -164,16 +164,16 @@ impl JobInfo for SlurmJobEntry {
             let env_string = String::from_utf8_lossy(s.split_at(4).1).to_string();
             env_string
                 .split('\0')
-                .filter_map(|entry| {
+                .filter_map(|entry| -> Option<(String, String)> {
                     let entry = entry.trim();
                     if !entry.is_empty() {
                         let parts: Vec<_> = entry.split('=').collect();
                         match parts.len() {
                             2 => {
                                 let key = parts[0].trim();
-                                println!("Checking for key {}", &key);
+                                debug!("Checking for key {}", &key);
                                 if !key.is_empty() && !filter_env(&r, key) {
-                                    println!("Keeping key {}", &key);
+                                    debug!("Keeping key {}", &key);
                                     Some((key.to_owned(), parts[1].to_owned()))
                                 } else {
                                     None
@@ -403,5 +403,36 @@ mod tests {
         assert!(!filter_env(&regex, "VAR1"));
         assert!(!filter_env(&regex, "VAR2"));
         assert!(!filter_env(&regex, "OTHER"));
+    }
+    #[test]
+    fn test_extra_info_eb_regex() {
+        // Set up the test data with keys that both match and don't match the regex
+        let env_string =
+            b"\0\0\0\0__LMOD_FOO=bar\0EBROOT_baz=qux\0EBDEVELHUP=1234\0NONMATCHING_KEY=ignore\0_AnotherNonMatch=skip";
+
+        // Create a Regex for filtering based on the specified pattern
+        let filter_regex = Regex::new(r"(__LMOD|EBROOT|EBDEVEL|EBVERSION|_ModuleTable)").ok();
+
+        // Mock the struct instance with env_ and regex
+        let job_entry = SlurmJobEntry {
+            path_: PathBuf::from("/some/path"),
+            jobid_: "12345".to_string(),
+            cluster_: "mycluster".to_string(),
+            moment_: Instant::now(),
+            script_: None,
+            env_: Some(env_string.to_vec()),
+            filter_regex,
+        };
+
+        // Execute extra_info method
+        let result = job_entry.extra_info().unwrap();
+
+        // Expected result: the keys matching the regex should not be present
+        let mut expected = HashMap::new();
+        expected.insert("NONMATCHING_KEY".to_string(), "ignore".to_string());
+        expected.insert("_AnotherNonMatch".to_string(), "skip".to_string());
+
+        // Assert the filtered result is as expected
+        assert_eq!(result, expected);
     }
 }

@@ -129,6 +129,7 @@ fn main() -> Result<(), std::io::Error> {
     let archiver: Box<dyn Archive> = archive_builder(&cli.archiver.archiver).unwrap();
     let cluster = cli.cluster;
     let filter_regex = if let Some(r) = cli.filter_regex {
+        info!("Setting filter regex to {}", &r);
         Regex::new(&r).ok()
     } else {
         None
