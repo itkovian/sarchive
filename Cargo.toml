@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.13.1"
+version = "0.13.2"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2021"
 description = "Archival tool for slurm job scripts"
@@ -27,12 +27,12 @@ crossbeam-channel = "~0.5"
 crossbeam-queue = "~0.3"
 crossbeam-utils = "~0.8"
 enum-display-derive = "0.1.1"
-fern = { version = "0.6.1", features = ["reopen-03"] }
+fern = { version = "0.7.0", features = ["reopen-03"] }
 glob = "0.3.1"
 itertools = "~0.13"
 libc = "0.2.155"
 log = "^0.4"
-notify = "6.0.1"
+notify = "7.0.0"
 proc-macro2 = "~1.0"
 rdkafka = { version = "~0.36", optional = true, features = ["ssl", "sasl"] }
 regex = "1.10.5"
@@ -55,7 +55,7 @@ path = "src/main.rs"
 kafka = ["rdkafka", "serde", "serde_derive", "serde_json"]
 
 [dev-dependencies]
-tempfile = "~3.12"
+tempfile = "~3.13"
 tokio = "1.35.1"
 mockito = "1.2.0"
 
