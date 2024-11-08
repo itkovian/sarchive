@@ -394,7 +394,7 @@ mod tests {
         // create env and script files
         let env_path = job_dir.join("environment");
         let mut env = File::create(env_path).unwrap();
-        env.write(b"environment").unwrap();
+        env.write(b"\0\0\0\0environment=1234").unwrap();
 
         let job_path = job_dir.join("script");
         let mut job = File::create(&job_path).unwrap();
@@ -414,7 +414,7 @@ mod tests {
 
         let archive_env_contents =
             read_to_string(&archive_dir.join("job.1234_environment")).unwrap();
-        assert_eq!(&archive_env_contents, "environment");
+        assert_eq!(&archive_env_contents, "environment=1234");
 
         let archive_script_contents = read_to_string(&archive_dir.join("job.1234_script")).unwrap();
         assert_eq!(&archive_script_contents, "job script");
