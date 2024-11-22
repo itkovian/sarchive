@@ -4,8 +4,11 @@ jobs:
   semver-check:
     runs-on: ubuntu-latest
     steps:
+      - run: sudo apt-get install libsasl2-dev  libsasl2-2
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Check semver
-        uses: obi1kenobi/cargo-semver-checks-action@v2
+        uses: obi1kenobi/cargo-semver-checks-action@v2.6
         with:
           # Ensure we include all new non-default features here explicitly, except for
           # pass-through mutually-exclusive features from our dependencies such as:
