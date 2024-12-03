@@ -50,7 +50,7 @@ pub fn create(
     filter_regex: &Option<Regex>,
 ) -> Box<dyn Scheduler> {
     match scheduler {
-        SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster, &filter_regex)),
+        SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster, filter_regex)),
         SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path, cluster)),
     }
 }

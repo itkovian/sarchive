@@ -138,7 +138,7 @@ impl KafkaArchive {
     /// # Returns
     ///
     /// A `Result` containing the created `KafkaArchive` instance or an error.
-    pub fn build(args: &KafkaArgs) -> Result<Self, Error> {
+    pub fn build(args: KafkaArgs) -> Result<Self, Error> {
         info!(
             "Using Kafka archival, talking to {} on topic {} using protocol {}",
             args.brokers, args.topic, args.security_protocol
@@ -311,7 +311,7 @@ mod tests {
             sasl,
         };
 
-        let kafka_archive = KafkaArchive::build(&kafka_args).unwrap();
+        let kafka_archive = KafkaArchive::build(kafka_args).unwrap();
 
         // Assert that the KafkaArchive was built successfully
         assert_eq!(kafka_archive.topic, topic);
