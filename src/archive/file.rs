@@ -103,7 +103,7 @@ impl Archive for FileArchive {
         debug!("Target path: {:?}", target_path);
         let options = SimpleFileOptions::default()
             .compression_method(self.zip)
-            .unix_permissions(0o750);
+            .unix_permissions(0o660);
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
             let suffix = match self.zip {
