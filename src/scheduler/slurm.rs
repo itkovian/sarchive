@@ -72,12 +72,7 @@ impl SlurmJobEntry {
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
-    pub fn new(
-        path: &Path,
-        id: &str,
-        cluster: &str,
-        filter_regex: &Option<Regex>,
-    ) -> SlurmJobEntry {
+    pub fn new(path: &Path, id: &str, cluster: &str, filter_regex: Option<Regex>) -> SlurmJobEntry {
         SlurmJobEntry {
             path_: path.to_path_buf(),
             jobid_: id.to_string(),
@@ -85,7 +80,7 @@ impl SlurmJobEntry {
             moment_: Instant::now(),
             script_: None,
             env_: None,
-            filter_regex: filter_regex.clone(),
+            filter_regex,
         }
     }
 }
@@ -267,7 +262,7 @@ impl Scheduler for Slurm {
                 event_path,
                 jobid,
                 &self.cluster,
-                &self.filter_regex,
+                self.filter_regex.clone(),
             )))
         } else {
             None
