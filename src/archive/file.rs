@@ -24,6 +24,8 @@ use log::{debug, error, warn};
 use std::fs::{create_dir_all, File};
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
+use zip::write::SimpleFileOptions;
+use zip::CompressionMethod;
 
 use super::Archive;
 use crate::scheduler::job::JobInfo;
@@ -33,6 +35,8 @@ use crate::scheduler::job::JobInfo;
 pub struct FileArgs {
     archive: PathBuf,
     period: Period,
+    #[arg(default_value_t = false)]
+    zip: bool,
 }
 
 /// An enum to define a hierachy in the archive
@@ -52,13 +56,15 @@ pub enum Period {
 pub struct FileArchive {
     archive_path: PathBuf,
     period: Period,
+    zip: CompressionMethod,
 }
 
 impl FileArchive {
-    pub fn new(archive_path: &PathBuf, p: &Period) -> Self {
+    pub fn new(archive_path: &PathBuf, p: &Period, z: &CompressionMethod) -> Self {
         FileArchive {
             archive_path: archive_path.to_owned(),
             period: p.to_owned(),
+            zip: z.to_owned(),
         }
     }
 
@@ -76,7 +82,15 @@ impl FileArchive {
             }
         };
 
-        Ok(FileArchive::new(&archive, &args.period))
+        Ok(FileArchive::new(
+            &archive,
+            &args.period,
+            if args.zip {
+                &CompressionMethod::Bzip2
+            } else {
+                &CompressionMethod::Stored
+            },
+        ))
     }
 }
 
@@ -87,10 +101,21 @@ impl Archive for FileArchive {
         let archive_path = &self.archive_path;
         let target_path = determine_target_path(archive_path, &self.period);
         debug!("Target path: {:?}", target_path);
+        let options = SimpleFileOptions::default()
+            .compression_method(self.zip)
+            .unix_permissions(0o750);
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
-            let mut f = File::create(target_path.join(fname))?;
-            f.write_all(fcontents)?;
+            let suffix = match self.zip {
+                CompressionMethod::Bzip2 => ".bz2",
+                CompressionMethod::Stored => "",
+                _ => ".zip",
+            };
+            let file = File::create(target_path.join(format!("{}{}", fname, suffix)))?;
+            let mut zip = zip::ZipWriter::new(file);
+            zip.start_file(fname, options)?;
+            zip.write_all(fcontents)?;
+            zip.finish()?;
         }
         Ok(())
     }
@@ -149,7 +174,7 @@ mod tests {
         let archive_path = PathBuf::from("/tmp/archive");
         let period = Period::Daily;
 
-        let file_archive = FileArchive::new(&archive_path, &period);
+        let file_archive = FileArchive::new(&archive_path, &period, &CompressionMethod::Stored);
 
         assert_eq!(file_archive.archive_path, archive_path);
         assert_eq!(file_archive.period, period);
@@ -164,6 +189,7 @@ mod tests {
         let args = FileArgs {
             archive: archive_path.clone(),
             period: period.clone(),
+            zip: false,
         };
 
         let file_archive = FileArchive::build(&args).unwrap();
@@ -181,6 +207,7 @@ mod tests {
         let args = FileArgs {
             archive: archive_path.clone(),
             period: period.clone(),
+            zip: false,
         };
 
         let file_archive = FileArchive::build(&args).unwrap();
@@ -292,7 +319,7 @@ mod tests {
         let job_info: Box<dyn JobInfo + 'static> =
             Box::new(DummyJobInfo::new("123", Instant::now(), "test_cluster"));
 
-        let file_archive = FileArchive::new(&archive_path, &period);
+        let file_archive = FileArchive::new(&archive_path, &period, &CompressionMethod::Stored);
         file_archive.archive(&job_info).unwrap();
 
         for (fname, fcontents) in job_info.files().iter() {
@@ -405,7 +432,8 @@ mod tests {
             assert!(false);
         }
 
-        let file_archiver = FileArchive::new(&archive_dir, &Period::None);
+        let file_archiver =
+            FileArchive::new(&archive_dir, &Period::None, &CompressionMethod::Stored);
         let jobinfo: Box<dyn JobInfo> = Box::new(slurm_job_entry);
         file_archiver.archive(&jobinfo).unwrap();
 
