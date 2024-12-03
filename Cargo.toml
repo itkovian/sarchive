@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.13.3"
+version = "0.14.0"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2021"
 description = "Archival tool for slurm job scripts"
