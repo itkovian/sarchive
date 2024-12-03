@@ -311,7 +311,7 @@ mod tests {
             sasl,
         };
 
-        let kafka_archive = KafkaArchive::build(&kafka_args).unwrap();
+        let kafka_archive = KafkaArchive::build(kafka_args).unwrap();
 
         // Assert that the KafkaArchive was built successfully
         assert_eq!(kafka_archive.topic, topic);

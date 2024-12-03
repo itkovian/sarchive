@@ -162,7 +162,7 @@ mod tests {
         let archive_path = PathBuf::from("/tmp/archive");
         let period = Period::Daily;
 
-        let file_archive = FileArchive::new(&archive_path, &period, &CompressionMethod::Stored);
+        let file_archive = FileArchive::new(&archive_path, &period, false);
 
         assert_eq!(file_archive.archive_path, archive_path);
         assert_eq!(file_archive.period, period);
@@ -180,7 +180,7 @@ mod tests {
             zip: false,
         };
 
-        let file_archive = FileArchive::build(&args).unwrap();
+        let file_archive = FileArchive::build(args).unwrap();
 
         assert_eq!(file_archive.archive_path, archive_path);
         assert_eq!(file_archive.period, period);
@@ -198,7 +198,7 @@ mod tests {
             zip: false,
         };
 
-        let file_archive = FileArchive::build(&args).unwrap();
+        let file_archive = FileArchive::build(args).unwrap();
 
         assert_eq!(file_archive.archive_path, archive_path);
         assert_eq!(file_archive.period, period);
@@ -307,7 +307,7 @@ mod tests {
         let job_info: Box<dyn JobInfo + 'static> =
             Box::new(DummyJobInfo::new("123", Instant::now(), "test_cluster"));
 
-        let file_archive = FileArchive::new(&archive_path, &period, &CompressionMethod::Stored);
+        let file_archive = FileArchive::new(&archive_path, &period, false);
         file_archive.archive(&job_info).unwrap();
 
         for (fname, fcontents) in job_info.files().iter() {
@@ -415,13 +415,12 @@ mod tests {
         let mut job = File::create(&job_path).unwrap();
         job.write(b"job script").unwrap();
 
-        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", &None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", None);
         if let Err(_) = slurm_job_entry.read_job_info() {
             assert!(false);
         }
 
-        let file_archiver =
-            FileArchive::new(&archive_dir, &Period::None, &CompressionMethod::Stored);
+        let file_archiver = FileArchive::new(&archive_dir, &Period::None, false);
         let jobinfo: Box<dyn JobInfo> = Box::new(slurm_job_entry);
         file_archiver.archive(&jobinfo).unwrap();
 

@@ -68,7 +68,7 @@ impl SlurmJobEntry {
     /// let id = "1234";
     /// let cluster = "mycluster";
     ///
-    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster, &None);
+    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster, None);
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
@@ -332,7 +332,7 @@ mod tests {
     #[test]
     fn test_read_job_script_drop_zero() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", &None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", None);
         slurm_job_entry.read_job_info().unwrap();
 
         // check the script
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn test_read_job_extra_info() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", &None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", None);
         slurm_job_entry.read_job_info().unwrap();
 
         // check the environment information
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn test_extra_info_drop_u32_prefix() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.8897161"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster", &None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster", None);
         if let Err(e) = slurm_job_entry.read_job_info() {
             println!("Could not read job info: {:?}", e);
             assert!(false);
