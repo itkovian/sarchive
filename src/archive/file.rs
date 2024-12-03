@@ -19,13 +19,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+use bzip2::write::BzEncoder;
+use bzip2::Compression;
 use clap::{Args, ValueEnum};
 use log::{debug, error, warn};
 use std::fs::{create_dir_all, File};
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
-use zip::write::SimpleFileOptions;
-use zip::CompressionMethod;
 
 use super::Archive;
 use crate::scheduler::job::JobInfo;
@@ -56,11 +56,11 @@ pub enum Period {
 pub struct FileArchive {
     archive_path: PathBuf,
     period: Period,
-    zip: CompressionMethod,
+    zip: bool,
 }
 
 impl FileArchive {
-    pub fn new(archive_path: &PathBuf, p: &Period, z: &CompressionMethod) -> Self {
+    pub fn new(archive_path: &PathBuf, p: &Period, z: bool) -> Self {
         FileArchive {
             archive_path: archive_path.to_owned(),
             period: p.to_owned(),
@@ -82,15 +82,7 @@ impl FileArchive {
             }
         };
 
-        Ok(FileArchive::new(
-            &archive,
-            &args.period,
-            if args.zip {
-                &CompressionMethod::Bzip2
-            } else {
-                &CompressionMethod::Stored
-            },
-        ))
+        Ok(FileArchive::new(&archive, &args.period, args.zip))
     }
 }
 
@@ -103,22 +95,14 @@ impl Archive for FileArchive {
         debug!("Target path: {:?}", target_path);
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
-            match self.zip {
-                CompressionMethod::Stored => {
-                    let mut f = File::create(target_path.join(fname))?;
-                    f.write_all(fcontents)?;
-                }
-                CompressionMethod::Bzip2 => {
-                    let options = SimpleFileOptions::default()
-                        .compression_method(self.zip)
-                        .unix_permissions(0o660);
-                    let file = File::create(target_path.join(format!("{}.bz2", fname)))?;
-                    let mut zip = zip::ZipWriter::new(file);
-                    zip.start_file(fname, options)?;
-                    zip.write_all(fcontents)?;
-                    zip.finish()?;
-                }
-                _ => panic!("Compression method unsupported!"),
+            if self.zip {
+                let file = File::create(target_path.join(format!("{}.bz2", fname)))?;
+                let mut encoder = BzEncoder::new(file, Compression::best());
+                encoder.write_all(fcontents)?;
+                encoder.finish()?;
+            } else {
+                let mut f = File::create(target_path.join(fname))?;
+                f.write_all(fcontents)?;
             };
         }
         Ok(())
