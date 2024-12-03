@@ -19,6 +19,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+use bzip2::write::BzEncoder;
+use bzip2::Compression;
 use clap::{Args, ValueEnum};
 use log::{debug, error, warn};
 use std::fs::{create_dir_all, File};
@@ -33,6 +35,8 @@ use crate::scheduler::job::JobInfo;
 pub struct FileArgs {
     archive: PathBuf,
     period: Period,
+    #[arg(long, default_value_t = false)]
+    zip: bool,
 }
 
 /// An enum to define a hierachy in the archive
@@ -52,17 +56,19 @@ pub enum Period {
 pub struct FileArchive {
     archive_path: PathBuf,
     period: Period,
+    zip: bool,
 }
 
 impl FileArchive {
-    pub fn new(archive_path: &PathBuf, p: &Period) -> Self {
+    pub fn new(archive_path: &PathBuf, p: &Period, z: bool) -> Self {
         FileArchive {
             archive_path: archive_path.to_owned(),
             period: p.to_owned(),
+            zip: z.to_owned(),
         }
     }
 
-    pub fn build(args: &FileArgs) -> Result<Self, Error> {
+    pub fn build(args: FileArgs) -> Result<Self, Error> {
         let archive = args.archive.to_owned();
 
         if !archive.is_dir() {
@@ -76,7 +82,7 @@ impl FileArchive {
             }
         };
 
-        Ok(FileArchive::new(&archive, &args.period))
+        Ok(FileArchive::new(&archive, &args.period, args.zip))
     }
 }
 
@@ -89,8 +95,15 @@ impl Archive for FileArchive {
         debug!("Target path: {:?}", target_path);
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
-            let mut f = File::create(target_path.join(fname))?;
-            f.write_all(fcontents)?;
+            if self.zip {
+                let file = File::create(target_path.join(format!("{}.bz2", fname)))?;
+                let mut encoder = BzEncoder::new(file, Compression::best());
+                encoder.write_all(fcontents)?;
+                encoder.finish()?;
+            } else {
+                let mut f = File::create(target_path.join(fname))?;
+                f.write_all(fcontents)?;
+            };
         }
         Ok(())
     }
@@ -149,7 +162,7 @@ mod tests {
         let archive_path = PathBuf::from("/tmp/archive");
         let period = Period::Daily;
 
-        let file_archive = FileArchive::new(&archive_path, &period);
+        let file_archive = FileArchive::new(&archive_path, &period, false);
 
         assert_eq!(file_archive.archive_path, archive_path);
         assert_eq!(file_archive.period, period);
@@ -164,9 +177,10 @@ mod tests {
         let args = FileArgs {
             archive: archive_path.clone(),
             period: period.clone(),
+            zip: false,
         };
 
-        let file_archive = FileArchive::build(&args).unwrap();
+        let file_archive = FileArchive::build(args).unwrap();
 
         assert_eq!(file_archive.archive_path, archive_path);
         assert_eq!(file_archive.period, period);
@@ -181,9 +195,10 @@ mod tests {
         let args = FileArgs {
             archive: archive_path.clone(),
             period: period.clone(),
+            zip: false,
         };
 
-        let file_archive = FileArchive::build(&args).unwrap();
+        let file_archive = FileArchive::build(args).unwrap();
 
         assert_eq!(file_archive.archive_path, archive_path);
         assert_eq!(file_archive.period, period);
@@ -292,7 +307,7 @@ mod tests {
         let job_info: Box<dyn JobInfo + 'static> =
             Box::new(DummyJobInfo::new("123", Instant::now(), "test_cluster"));
 
-        let file_archive = FileArchive::new(&archive_path, &period);
+        let file_archive = FileArchive::new(&archive_path, &period, false);
         file_archive.archive(&job_info).unwrap();
 
         for (fname, fcontents) in job_info.files().iter() {
@@ -394,18 +409,18 @@ mod tests {
         // create env and script files
         let env_path = job_dir.join("environment");
         let mut env = File::create(env_path).unwrap();
-        env.write(b"environment").unwrap();
+        env.write(b"\0\0\0\0environment=1234").unwrap();
 
         let job_path = job_dir.join("script");
         let mut job = File::create(&job_path).unwrap();
         job.write(b"job script").unwrap();
 
-        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", &None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", None);
         if let Err(_) = slurm_job_entry.read_job_info() {
             assert!(false);
         }
 
-        let file_archiver = FileArchive::new(&archive_dir, &Period::None);
+        let file_archiver = FileArchive::new(&archive_dir, &Period::None, false);
         let jobinfo: Box<dyn JobInfo> = Box::new(slurm_job_entry);
         file_archiver.archive(&jobinfo).unwrap();
 
@@ -414,7 +429,7 @@ mod tests {
 
         let archive_env_contents =
             read_to_string(&archive_dir.join("job.1234_environment")).unwrap();
-        assert_eq!(&archive_env_contents, "environment");
+        assert_eq!(&archive_env_contents, "environment=1234");
 
         let archive_script_contents = read_to_string(&archive_dir.join("job.1234_script")).unwrap();
         assert_eq!(&archive_script_contents, "job script");

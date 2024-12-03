@@ -37,7 +37,7 @@ mod monitor;
 mod scheduler;
 mod utils;
 
-use archive::{archive_builder, process, Archive, ArchiverOptions};
+use archive::{archive_builder, process, Archive, Archiver};
 
 use monitor::monitor;
 use scheduler::{create, SchedulerKind};
@@ -105,8 +105,8 @@ struct Cli {
     #[arg(long)]
     filter_regex: Option<String>,
 
-    #[command(flatten)]
-    archiver: ArchiverOptions,
+    #[command(subcommand)]
+    archiver: Archiver,
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -126,7 +126,7 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     let scheduler = cli.scheduler;
-    let archiver: Box<dyn Archive> = archive_builder(&cli.archiver.archiver).unwrap();
+    let archiver: Box<dyn Archive> = archive_builder(cli.archiver).unwrap();
     let cluster = cli.cluster;
     let filter_regex = if let Some(r) = cli.filter_regex {
         info!("Setting filter regex to {}", &r);

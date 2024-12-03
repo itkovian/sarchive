@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use log::debug;
+use log::{debug, info};
 use notify::event::{CreateKind, Event, EventKind};
 use regex::Regex;
 use std::collections::HashMap;
@@ -68,16 +68,11 @@ impl SlurmJobEntry {
     /// let id = "1234";
     /// let cluster = "mycluster";
     ///
-    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster, &None);
+    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster, None);
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
-    pub fn new(
-        path: &Path,
-        id: &str,
-        cluster: &str,
-        filter_regex: &Option<Regex>,
-    ) -> SlurmJobEntry {
+    pub fn new(path: &Path, id: &str, cluster: &str, filter_regex: Option<Regex>) -> SlurmJobEntry {
         SlurmJobEntry {
             path_: path.to_path_buf(),
             jobid_: id.to_string(),
@@ -85,7 +80,7 @@ impl SlurmJobEntry {
             moment_: Instant::now(),
             script_: None,
             env_: None,
-            filter_regex: filter_regex.clone(),
+            filter_regex,
         }
     }
 }
@@ -137,9 +132,17 @@ impl JobInfo for SlurmJobEntry {
     /// Returns a `Vector` with tuples containing the filename and the
     /// file contents for the script and environment files
     fn files(&self) -> Vec<(String, Vec<u8>)> {
+        let environment = self.extra_info().map(|m| {
+            m.iter()
+                .map(|(key, value)| format!("{}={}", key, value))
+                .collect::<Vec<String>>()
+                .join("\n")
+                .into_bytes()
+        });
+
         [
             ("script", self.script_.as_ref()),
-            ("environment", self.env_.as_ref()),
+            ("environment", environment.as_ref()),
         ]
         .iter()
         .filter_map(|(filename, v)| {
@@ -160,6 +163,8 @@ impl JobInfo for SlurmJobEntry {
     /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
         let r = self.filter_regex.clone();
+        debug!("Checking extra info");
+        info!("Checking extra info info");
         self.env_.as_ref().map(|s| {
             let env_string = String::from_utf8_lossy(s.split_at(4).1).to_string();
             env_string
@@ -246,7 +251,7 @@ impl Scheduler for Slurm {
             .collect()
     }
 
-    /// Returns a Box wrapping the actual job info data structure.App
+    /// Returns a Box wrapping the actual job info data structure.
     ///
     /// # Arguments
     ///
@@ -257,7 +262,7 @@ impl Scheduler for Slurm {
                 event_path,
                 jobid,
                 &self.cluster,
-                &self.filter_regex,
+                self.filter_regex.clone(),
             )))
         } else {
             None
@@ -327,7 +332,7 @@ mod tests {
     #[test]
     fn test_read_job_script_drop_zero() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", &None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", None);
         slurm_job_entry.read_job_info().unwrap();
 
         // check the script
@@ -338,7 +343,7 @@ mod tests {
     #[test]
     fn test_read_job_extra_info() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", &None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", None);
         slurm_job_entry.read_job_info().unwrap();
 
         // check the environment information
@@ -355,7 +360,7 @@ mod tests {
     #[test]
     fn test_extra_info_drop_u32_prefix() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.8897161"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster", &None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster", None);
         if let Err(e) = slurm_job_entry.read_job_info() {
             println!("Could not read job info: {:?}", e);
             assert!(false);
