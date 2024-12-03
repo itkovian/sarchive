@@ -101,21 +101,25 @@ impl Archive for FileArchive {
         let archive_path = &self.archive_path;
         let target_path = determine_target_path(archive_path, &self.period);
         debug!("Target path: {:?}", target_path);
-        let options = SimpleFileOptions::default()
-            .compression_method(self.zip)
-            .unix_permissions(0o660);
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
-            let suffix = match self.zip {
-                CompressionMethod::Bzip2 => ".bz2",
-                CompressionMethod::Stored => "",
-                _ => ".zip",
+            match self.zip {
+                CompressionMethod::Stored => {
+                    let mut f = File::create(target_path.join(fname))?;
+                    f.write_all(fcontents)?;
+                }
+                CompressionMethod::Bzip2 => {
+                    let options = SimpleFileOptions::default()
+                        .compression_method(self.zip)
+                        .unix_permissions(0o660);
+                    let file = File::create(target_path.join(format!("{}.bz2", fname)))?;
+                    let mut zip = zip::ZipWriter::new(file);
+                    zip.start_file(fname, options)?;
+                    zip.write_all(fcontents)?;
+                    zip.finish()?;
+                }
+                _ => panic!("Compression method unsupported!"),
             };
-            let file = File::create(target_path.join(format!("{}{}", fname, suffix)))?;
-            let mut zip = zip::ZipWriter::new(file);
-            zip.start_file(fname, options)?;
-            zip.write_all(fcontents)?;
-            zip.finish()?;
         }
         Ok(())
     }
