@@ -35,7 +35,7 @@ use crate::scheduler::job::JobInfo;
 pub struct FileArgs {
     archive: PathBuf,
     period: Period,
-    #[arg(default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     zip: bool,
 }
 
@@ -68,7 +68,7 @@ impl FileArchive {
         }
     }
 
-    pub fn build(args: &FileArgs) -> Result<Self, Error> {
+    pub fn build(args: FileArgs) -> Result<Self, Error> {
         let archive = args.archive.to_owned();
 
         if !archive.is_dir() {

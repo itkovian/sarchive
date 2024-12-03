@@ -138,7 +138,7 @@ impl KafkaArchive {
     /// # Returns
     ///
     /// A `Result` containing the created `KafkaArchive` instance or an error.
-    pub fn build(args: &KafkaArgs) -> Result<Self, Error> {
+    pub fn build(args: KafkaArgs) -> Result<Self, Error> {
         info!(
             "Using Kafka archival, talking to {} on topic {} using protocol {}",
             args.brokers, args.topic, args.security_protocol
