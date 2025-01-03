@@ -91,51 +91,44 @@ impl JobInfo for TorqueJobEntry {
     // the backup or ship the information to some consumer
     fn read_job_info(&mut self) -> Result<(), Error> {
         let dir = self.path_.parent().unwrap();
-        let filename = self.path_.strip_prefix(dir).unwrap();
+        let filename = Path::new(self.path_.file_name().unwrap());
         self.jobname_ = Some(filename.to_str().unwrap().to_string());
         self.script_ = Some(utils::read_file(dir, filename, None)?);
 
-        // check for the presence of a .TA file
+        // Check for the presence of a .TA file
         let ta_filename = filename.with_extension("TA");
-        let ta = utils::read_file(dir, &ta_filename, Some(10));
-        if let Ok(ta_contents) = ta {
+        if let Ok(ta_contents) = utils::read_file(dir, &ta_filename, Some(10)) {
             self.env_
                 .insert(ta_filename.to_str().unwrap().to_string(), ta_contents);
+
             // If the job is an array job, there are multiple JB files.
             // The file name pattern is: 2720868-946.master.cluster.JB
             // Split the filename into appropriate parts
-            let fparts = filename.to_str().unwrap().split('.').collect::<Vec<&str>>();
+            let job_prefix = filename.to_str().unwrap().split('.').next().unwrap();
             debug!(
                 "Found TA file, looking for JB files in {:?} with name {}",
-                dir, fparts[0]
+                dir, job_prefix
             );
-            glob(&format!("{}/{}-*.JB", dir.display(), fparts[0]))
+
+            for jb_path in glob(&format!("{}/{}-*.JB", dir.display(), job_prefix))
                 .unwrap()
-                .filter_map(|jb_path| {
-                    if let Ok(jb_path) = jb_path {
-                        let jb_dir = jb_path.parent()?;
-                        let jb_filename = jb_path.strip_prefix(jb_dir).unwrap();
-                        let jb = utils::read_file(jb_dir, jb_filename, Some(10)).unwrap();
-                        Some((jb_filename.to_owned(), jb))
-                    } else {
-                        None
-                    }
-                })
-                .map(|(jb_filename, jb)| {
+                .filter_map(Result::ok)
+            {
+                let jb_filename = Path::new(jb_path.file_name().unwrap());
+                if let Ok(jb_contents) = utils::read_file(dir, jb_filename, Some(10)) {
                     self.env_
-                        .insert(jb_filename.to_str().unwrap().to_string(), jb);
-                    Some(())
-                })
-                .for_each(drop);
+                        .insert(jb_filename.to_str().unwrap().to_string(), jb_contents);
+                }
+            }
 
             return Ok(());
         }
 
-        // If it  was no array job, there should be a single .JB file to pick up.
+        // If it was not an array job, there should be a single .JB file to pick up.
         let jb_filename = filename.with_extension("JB");
-        let jb = utils::read_file(dir, &jb_filename, None)?;
+        let jb_contents = utils::read_file(dir, &jb_filename, None)?;
         self.env_
-            .insert(jb_filename.to_str().unwrap().to_string(), jb);
+            .insert(jb_filename.to_str().unwrap().to_string(), jb_contents);
         Ok(())
     }
 
