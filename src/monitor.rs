@@ -74,8 +74,12 @@ pub fn monitor(
 ) -> notify::Result<()> {
     let (tx, rx) = unbounded();
 
-    // create a platform-specific watcher
-    let mut watcher = recommended_watcher(move |res| tx.send(res).unwrap())?;
+    // Create a platform-specific watcher
+    let mut watcher = recommended_watcher(move |res| {
+        if tx.send(res).is_err() {
+            error!("Failed to send event through channel");
+        }
+    })?;
 
     info!("Watching path {:?}", path);
 
@@ -84,14 +88,18 @@ pub fn monitor(
     #[allow(clippy::zero_ptr, dropping_copy_types)]
     loop {
         select! {
-            recv(sigchannel) -> b => if let Ok(true) = b  {
+            recv(sigchannel) -> b => if let Ok(true) = b {
                 break Ok(());
             },
             recv(rx) -> event => {
                 match event {
-                    Ok(Ok(e)) => check_and_queue(scheduler, s, e)?,
+                    Ok(Ok(e)) => {
+                        if let Err(err) = check_and_queue(scheduler, s, e) {
+                            error!("Failed to check and queue event: {:?}", err);
+                        }
+                    },
                     Ok(Err(_)) | Err(_) => {
-                        error!("Error on received event: {:?}", event);
+                        error!("Error on received event");
                         break Err(notify::Error::new(notify::ErrorKind::Generic("Problem receiving event".to_string())));
                     }
                 }
