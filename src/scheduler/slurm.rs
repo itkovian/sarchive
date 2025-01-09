@@ -116,7 +116,7 @@ impl JobInfo for SlurmJobEntry {
     fn read_job_info(&mut self) -> Result<(), Error> {
         self.script_ = {
             let mut s = utils::read_file(&self.path_, Path::new("script"), None)?;
-            if let Some(0) = s.last() {
+            if s.last() == Some(&0) {
                 s.pop();
             }
             Some(s)
@@ -134,21 +134,19 @@ impl JobInfo for SlurmJobEntry {
     fn files(&self) -> Vec<(String, Vec<u8>)> {
         let environment = self.extra_info().map(|m| {
             m.iter()
-                .map(|(key, value)| format!("{}={}", key, value))
-                .collect::<Vec<String>>()
+                .map(|(key, value)| format!("{key}={value}"))
+                .collect::<Vec<_>>()
                 .join("\n")
                 .into_bytes()
         });
 
-        [
-            ("script", self.script_.as_ref()),
-            ("environment", environment.as_ref()),
-        ]
-        .iter()
-        .filter_map(|(filename, v)| {
-            v.map(|s| (format!("job.{}_{}", self.jobid_, filename), s.to_owned()))
-        })
-        .collect()
+        [("script", &self.script_), ("environment", &environment)]
+            .iter()
+            .filter_map(|(filename, v)| {
+                v.as_ref()
+                    .map(|s| (format!("job.{}_{}", self.jobid_, filename), s.clone()))
+            })
+            .collect()
     }
 
     /// Returns the job script as a `String`
@@ -162,35 +160,24 @@ impl JobInfo for SlurmJobEntry {
     /// Returns the environment info (if any) as a HashMap, mapping env keys
     /// to values
     fn extra_info(&self) -> Option<HashMap<String, String>> {
-        let r = self.filter_regex.clone();
-        debug!("Checking extra info");
-        info!("Checking extra info info");
         self.env_.as_ref().map(|s| {
-            let env_string = String::from_utf8_lossy(s.split_at(4).1).to_string();
+            let env_string = String::from_utf8_lossy(&s[4..]).to_string();
             env_string
                 .split('\0')
-                .filter_map(|entry| -> Option<(String, String)> {
+                .filter_map(|entry| {
                     let entry = entry.trim();
-                    if !entry.is_empty() {
-                        let parts: Vec<_> = entry.split('=').collect();
-                        match parts.len() {
-                            2 => {
-                                let key = parts[0].trim();
-                                debug!("Checking for key {}", &key);
-                                if !key.is_empty() && !filter_env(&r, key) {
-                                    debug!("Keeping key {}", &key);
-                                    Some((key.to_owned(), parts[1].to_owned()))
-                                } else {
-                                    None
-                                }
-                            }
-                            _ => Some((entry.to_owned(), String::from(""))),
-                        }
-                    } else {
-                        None
+                    if entry.is_empty() {
+                        return None;
                     }
+                    let parts: Vec<_> = entry.splitn(2, '=').collect();
+                    let key = parts[0].trim();
+                    if key.is_empty() || filter_env(&self.filter_regex, key) {
+                        return None;
+                    }
+                    let value = parts.get(1).map_or("", |v| *v);
+                    Some((key.to_owned(), value.to_owned()))
                 })
-                .collect::<HashMap<String, String>>()
+                .collect()
         })
     }
 }

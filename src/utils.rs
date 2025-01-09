@@ -41,47 +41,44 @@ use std::time::Duration;
 /// We return the raw bytes, so the contents can be processed later if needed
 pub fn read_file(path: &Path, filename: &Path, iters: Option<u32>) -> Result<Vec<u8>, Error> {
     let fpath = path.join(filename);
-    let mut iters = iters.unwrap_or(100);
+    let iters = iters.unwrap_or(100);
     let ten_millis = Duration::from_millis(10);
-    while !Path::exists(&fpath) && iters > 0 {
+    for _ in 0..iters {
+        if fpath.exists() {
+            return fs::read(&fpath);
+        }
         debug!("Waiting for {:?}", &fpath);
         sleep(ten_millis);
-        if !Path::exists(path) {
+        if !path.exists() {
             debug!("Job directory {:?} no longer exists", &path);
             return Err(Error::new(
                 ErrorKind::NotFound,
                 format!("Job directory {:?} no longer exists", &path),
             ));
         }
-        iters -= 1;
     }
-    match iters {
-        0 => {
-            warn!("Timeout waiting for {:?} to appear", &fpath);
-            Err(Error::new(
-                ErrorKind::NotFound,
-                format!("File {:?} did not appear after waiting 1s", &fpath),
-            ))
-        }
-        _ => fs::read(&fpath),
-    }
+    warn!("Timeout waiting for {:?} to appear", &fpath);
+    Err(Error::new(
+        ErrorKind::NotFound,
+        format!("File {:?} did not appear after waiting 1s", &fpath),
+    ))
 }
 
 /// Register the handler for the given signal, so we can properly cleanup all threads
 pub fn register_signal_handler(signal: i32, unparker: &Unparker, notification: &Arc<AtomicBool>) {
     info!("Registering signal handler for signal {}", signal);
-    let u1 = unparker.clone();
-    let n1 = Arc::clone(notification);
+    let unparker_clone = unparker.clone();
+    let notification_clone = Arc::clone(notification);
     unsafe {
         if let Err(e) = signal_hook::low_level::register(signal, move || {
             info!("Received signal {}", signal);
-            n1.store(true, SeqCst);
-            u1.unpark()
+            notification_clone.store(true, SeqCst);
+            unparker_clone.unpark();
         }) {
             error!("Cannot register signal {}: {:?}", signal, e);
             exit(1);
         }
-    };
+    }
 }
 
 /// Handle the signal
@@ -96,11 +93,17 @@ pub fn signal_handler_atomic(sender: &Sender<bool>, sig: Arc<AtomicBool>, p: &Pa
         }
     }
 
+    let mut sent_count = 0;
     for _ in 0..20 {
-        sender.send(true).unwrap();
+        if sender.send(true).is_ok() {
+            sent_count += 1;
+        } else {
+            error!("Failed to send notification");
+            break;
+        }
     }
 
-    info!("Sent 20 notifications");
+    info!("Sent {} notifications", sent_count);
 }
 
 #[cfg(test)]
