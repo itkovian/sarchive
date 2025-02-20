@@ -2,7 +2,7 @@
 name = "sarchive"
 version = "0.14.0"
 authors = ["Andy Georges <itkovian@gmail.com>"]
-edition = "2021"
+edition = "2024"
 description = "Archival tool for slurm job scripts"
 license = "MIT"
 readme = "README.md"
