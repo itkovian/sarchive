@@ -213,17 +213,19 @@ mod tests {
         job_id: String,
         moment: Instant,
         cluster: String,
+        hostname: String,
         files: Vec<(String, Vec<u8>)>,
         script: String,
         extra_info: Option<HashMap<String, String>>,
     }
 
     impl DummyJobInfo {
-        fn new(job_id: &str, moment: Instant, cluster: &str) -> Self {
+        fn new(job_id: &str, moment: Instant, cluster: &str, hostname: &str) -> Self {
             DummyJobInfo {
                 job_id: job_id.to_string(),
                 moment,
                 cluster: cluster.to_string(),
+                hostname: hostname.to_string(),
                 files: vec![
                     ("file1.txt".to_string(), b"contents1".to_vec()),
                     ("file2.txt".to_string(), b"contents2".to_vec()),
@@ -245,6 +247,10 @@ mod tests {
 
         fn cluster(&self) -> String {
             self.cluster.clone()
+        }
+
+        fn hostname(&self) -> String {
+            self.hostname.clone()
         }
 
         fn read_job_info(&mut self) -> Result<(), std::io::Error> {
@@ -270,8 +276,9 @@ mod tests {
         let job_id = "123";
         let moment = Instant::now();
         let cluster = "test_cluster";
+        let hostname = "master";
 
-        let dummy_job_info = DummyJobInfo::new(job_id, moment, cluster);
+        let dummy_job_info = DummyJobInfo::new(job_id, moment, cluster, hostname);
 
         assert_eq!(dummy_job_info.jobid(), job_id);
         assert_eq!(dummy_job_info.moment(), moment);
@@ -289,14 +296,14 @@ mod tests {
 
     #[test]
     fn test_dummy_job_info_read_job_info() {
-        let mut dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster");
+        let mut dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster", "master");
         let result = dummy_job_info.read_job_info();
         assert!(result.is_ok()); // Placeholder test, assuming read_job_info always succeeds
     }
 
     #[test]
     fn test_dummy_job_info_files() {
-        let dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster");
+        let dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster", "master");
         let files = dummy_job_info.files();
         assert_eq!(files.len(), 2);
         assert_eq!(files[0].0, "file1.txt");
@@ -308,8 +315,12 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let archive_path = temp_dir.path().to_owned();
         let period = Period::Daily;
-        let job_info: Box<dyn JobInfo + 'static> =
-            Box::new(DummyJobInfo::new("123", Instant::now(), "test_cluster"));
+        let job_info: Box<dyn JobInfo + 'static> = Box::new(DummyJobInfo::new(
+            "123",
+            Instant::now(),
+            "test_cluster",
+            "master",
+        ));
 
         let file_archive = FileArchive::new(&archive_path, &period, false);
         file_archive.archive(&job_info).unwrap();
@@ -419,7 +430,7 @@ mod tests {
         let mut job = File::create(&job_path).unwrap();
         job.write(b"job script").unwrap();
 
-        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", "master", None);
         if let Err(_) = slurm_job_entry.read_job_info() {
             assert!(false);
         }
