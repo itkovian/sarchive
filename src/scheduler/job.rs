@@ -34,6 +34,9 @@ pub trait JobInfo: Send {
     // Return the cluster to which the job was submitted
     fn cluster(&self) -> String;
 
+    // Return the hostname where the job script was read
+    fn hostname(&self) -> String;
+
     // Retrieve all the information for the job from the spool location
     // This fills up the required data structures to be able to write
     // the backup or ship the information to some consumer
@@ -64,6 +67,7 @@ mod tests {
         job_id: String,
         moment: Instant,
         cluster: String,
+        hostname: String,
         script: String,
         extra_info: Option<HashMap<String, String>>,
         files: Vec<(String, Vec<u8>)>,
@@ -73,6 +77,7 @@ mod tests {
         fn new(
             job_id: &str,
             cluster: &str,
+            hostname: &str,
             script: &str,
             extra_info: Option<HashMap<String, String>>,
         ) -> Self {
@@ -80,6 +85,7 @@ mod tests {
                 job_id: job_id.to_string(),
                 moment: Instant::now(),
                 cluster: cluster.to_string(),
+                hostname: hostname.to_string(),
                 script: script.to_string(),
                 extra_info,
                 files: Vec::new(),
@@ -102,6 +108,10 @@ mod tests {
 
         fn cluster(&self) -> String {
             self.cluster.clone()
+        }
+
+        fn hostname(&self) -> String {
+            self.hostname.clone()
         }
 
         fn read_job_info(&mut self) -> Result<(), Error> {
@@ -134,25 +144,25 @@ mod tests {
 
     #[test]
     fn test_jobid() {
-        let job_info = DummyJobInfo::new("job123", "cluster1", "script1", None);
+        let job_info = DummyJobInfo::new("job123", "cluster1", "master", "script1", None);
         assert_eq!(job_info.jobid(), "job123");
     }
 
     #[test]
     fn test_moment() {
-        let job_info = DummyJobInfo::new("job123", "cluster1", "script1", None);
+        let job_info = DummyJobInfo::new("job123", "cluster1", "master", "script1", None);
         assert!(job_info.moment() <= Instant::now());
     }
 
     #[test]
     fn test_cluster() {
-        let job_info = DummyJobInfo::new("job123", "cluster1", "script1", None);
+        let job_info = DummyJobInfo::new("job123", "cluster1", "master", "script1", None);
         assert_eq!(job_info.cluster(), "cluster1");
     }
 
     #[test]
     fn test_read_job_info() {
-        let mut job_info = DummyJobInfo::new("job123", "cluster1", "script1", None);
+        let mut job_info = DummyJobInfo::new("job123", "cluster1", "master", "script1", None);
         assert!(job_info.files().is_empty());
 
         job_info.read_job_info().unwrap();
@@ -161,7 +171,7 @@ mod tests {
 
     #[test]
     fn test_script() {
-        let job_info = DummyJobInfo::new("job123", "cluster1", "script1", None);
+        let job_info = DummyJobInfo::new("job123", "cluster1", "master", "script1", None);
         assert_eq!(job_info.script(), "script1");
     }
 
@@ -174,7 +184,13 @@ mod tests {
             map
         };
 
-        let job_info = DummyJobInfo::new("job123", "cluster1", "script1", Some(extra_info.clone()));
+        let job_info = DummyJobInfo::new(
+            "job123",
+            "cluster1",
+            "master",
+            "script1",
+            Some(extra_info.clone()),
+        );
         assert_eq!(job_info.extra_info(), Some(extra_info));
     }
 }

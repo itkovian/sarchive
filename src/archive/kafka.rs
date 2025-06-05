@@ -189,6 +189,7 @@ impl Archive for KafkaArchive {
             id: job_entry.jobid(),
             timestamp: Utc::now(),
             cluster: job_entry.cluster(),
+            hostname: job_entry.hostname(),
             script: job_entry.script(),
             environment: job_entry.extra_info(),
         };

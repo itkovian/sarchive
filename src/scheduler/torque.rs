@@ -49,6 +49,8 @@ pub struct TorqueJobEntry {
     jobid_: String,
     /// The name of the cluster
     cluster_: String,
+    /// The hostname of the machine where we read job scripts
+    hostname_: String,
     /// Time of event notification and instance creation
     moment_: Instant,
     /// The actual job script
@@ -58,11 +60,12 @@ pub struct TorqueJobEntry {
 }
 
 impl TorqueJobEntry {
-    fn new(p: &Path, id: &str, cluster: &str) -> TorqueJobEntry {
+    fn new(p: &Path, id: &str, cluster: &str, hostname: &str) -> TorqueJobEntry {
         TorqueJobEntry {
             path_: p.to_path_buf(),
             jobname_: None,
             cluster_: cluster.to_string(),
+            hostname_: hostname.to_string(),
             jobid_: id.to_owned(),
             moment_: Instant::now(),
             script_: None,
@@ -84,6 +87,10 @@ impl JobInfo for TorqueJobEntry {
     // Return the cluster to which the job was submitted
     fn cluster(&self) -> String {
         self.cluster_.clone()
+    }
+
+    fn hostname(&self) -> String {
+        self.hostname_.clone()
     }
 
     // Retrieve all the information for the job from the spool location
@@ -169,14 +176,16 @@ impl JobInfo for TorqueJobEntry {
 pub struct Torque {
     pub base: PathBuf,
     pub cluster: String,
+    pub hostname: String,
     pub subdirs: bool,
 }
 
 impl Torque {
-    pub fn new(base: &Path, cluster: &str) -> Torque {
+    pub fn new(base: &Path, cluster: &str, hostname: &str) -> Torque {
         Torque {
             base: base.to_path_buf(),
             cluster: cluster.to_string(),
+            hostname: hostname.to_string(),
             subdirs: true, // FIXME: get from the cli argument
         }
     }
@@ -197,6 +206,7 @@ impl Scheduler for Torque {
                 filename,
                 jobid,
                 &self.cluster,
+                &self.hostname,
             )))
         } else {
             None
@@ -251,7 +261,7 @@ mod tests {
                 .unwrap()
                 .join("tests/torque_job.1/1.mymaster.mycluster.SC"),
         );
-        let mut torque_job_entry = TorqueJobEntry::new(&path, "1", "mycluster");
+        let mut torque_job_entry = TorqueJobEntry::new(&path, "1", "mycluster", "master");
         torque_job_entry.read_job_info().unwrap();
 
         assert!(torque_job_entry
@@ -270,7 +280,7 @@ mod tests {
                 .unwrap()
                 .join("tests/torque_job.2/2.mymaster.mycluster.SC"),
         );
-        let mut torque_job_entry = TorqueJobEntry::new(&path, "2", "mycluster");
+        let mut torque_job_entry = TorqueJobEntry::new(&path, "2", "mycluster", "master");
         torque_job_entry.read_job_info().unwrap();
 
         assert!(torque_job_entry

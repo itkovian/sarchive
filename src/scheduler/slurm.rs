@@ -19,7 +19,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-use log::{debug, info};
+use gethostname::gethostname;
+use log::debug;
 use notify::event::{CreateKind, Event, EventKind};
 use regex::Regex;
 use std::collections::HashMap;
@@ -40,6 +41,8 @@ pub struct SlurmJobEntry {
     jobid_: String,
     /// The name of the cluster
     cluster_: String,
+    /// The hostname of the machine where we read the script
+    hostname_: String,
     /// Time of event notification and instance creation
     moment_: Instant,
     /// The actual job script
@@ -72,11 +75,18 @@ impl SlurmJobEntry {
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
-    pub fn new(path: &Path, id: &str, cluster: &str, filter_regex: Option<Regex>) -> SlurmJobEntry {
+    pub fn new(
+        path: &Path,
+        id: &str,
+        cluster: &str,
+        hostname: &str,
+        filter_regex: Option<Regex>,
+    ) -> SlurmJobEntry {
         SlurmJobEntry {
             path_: path.to_path_buf(),
             jobid_: id.to_string(),
             cluster_: cluster.to_string(),
+            hostname_: hostname.to_string(),
             moment_: Instant::now(),
             script_: None,
             env_: None,
@@ -108,6 +118,10 @@ impl JobInfo for SlurmJobEntry {
     // Return the cluster to which the job was submitted
     fn cluster(&self) -> String {
         self.cluster_.clone()
+    }
+
+    fn hostname(&self) -> String {
+        self.hostname_.clone()
     }
 
     /// Populates the job entry structure with the relevant information
@@ -187,6 +201,7 @@ pub struct Slurm {
     /// The absolute path to the spool directory
     pub base: PathBuf,
     pub cluster: String,
+    pub hostname: String,
     pub filter_regex: Option<Regex>,
 }
 
@@ -197,6 +212,7 @@ impl Slurm {
     ///
     /// * `base` - A reference to a `Path` representing the base path.
     /// * `cluster` - A string slice representing the name of the cluster.
+    /// * `hostname` - A string slice representing the machine where we fetch the job scripts
     /// * `args` - A reference to `SlurmArgs` containing additional arguments.
     ///
     /// # Example
@@ -218,6 +234,7 @@ impl Slurm {
         Slurm {
             base: base.to_path_buf(),
             cluster: cluster.to_string(),
+            hostname: gethostname().to_string_lossy().to_string(),
             filter_regex: filter_regex.clone(),
         }
     }
@@ -249,6 +266,7 @@ impl Scheduler for Slurm {
                 event_path,
                 jobid,
                 &self.cluster,
+                &self.hostname,
                 self.filter_regex.clone(),
             )))
         } else {
@@ -319,7 +337,7 @@ mod tests {
     #[test]
     fn test_read_job_script_drop_zero() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", "master", None);
         slurm_job_entry.read_job_info().unwrap();
 
         // check the script
@@ -330,7 +348,7 @@ mod tests {
     #[test]
     fn test_read_job_extra_info() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.123456"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "123456", "mycluster", "master", None);
         slurm_job_entry.read_job_info().unwrap();
 
         // check the environment information
@@ -347,7 +365,7 @@ mod tests {
     #[test]
     fn test_extra_info_drop_u32_prefix() {
         let path = PathBuf::from(current_dir().unwrap().join("tests/job.8897161"));
-        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster", None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&path, "8897161", "mycluster", "master", None);
         if let Err(e) = slurm_job_entry.read_job_info() {
             println!("Could not read job info: {:?}", e);
             assert!(false);
@@ -368,6 +386,7 @@ mod tests {
             path_: PathBuf::from("/some/path"),
             jobid_: "12345".to_string(),
             cluster_: "mycluster".to_string(),
+            hostname_: "master".to_string(),
             moment_: Instant::now(),
             script_: None,
             env_: Some(env_data.to_vec()),
@@ -410,6 +429,7 @@ mod tests {
             path_: PathBuf::from("/some/path"),
             jobid_: "12345".to_string(),
             cluster_: "mycluster".to_string(),
+            hostname_: "master".to_string(),
             moment_: Instant::now(),
             script_: None,
             env_: Some(env_string.to_vec()),
