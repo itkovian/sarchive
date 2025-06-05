@@ -161,6 +161,12 @@ mod tests {
     }
 
     #[test]
+    fn test_hostname() {
+        let job_info = DummyJobInfo::new("job123", "cluster1", "master", "script1", None);
+        assert_eq!(job_info.hostname(), "master");
+    }
+
+    #[test]
     fn test_read_job_info() {
         let mut job_info = DummyJobInfo::new("job123", "cluster1", "master", "script1", None);
         assert!(job_info.files().is_empty());
