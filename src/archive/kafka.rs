@@ -175,6 +175,7 @@ struct JobMessage {
     pub timestamp: DateTime<Utc>,
     pub cluster: String,
     pub script: String,
+    pub hostname: String,
     pub environment: Option<HashMap<String, String>>,
 }
 
