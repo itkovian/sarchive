@@ -244,6 +244,10 @@ mod tests {
             "test_cluster".to_string()
         }
 
+        fn hostname(&self) -> String {
+            "master".to_string()
+        }
+
         fn read_job_info(&mut self) -> Result<(), std::io::Error> {
             Ok(())
         }

@@ -70,8 +70,9 @@ impl SlurmJobEntry {
     /// let p = PathBuf::from("/var/spool/slurm/hash.2/job.1234");
     /// let id = "1234";
     /// let cluster = "mycluster";
+    /// let hostname = "master";
     ///
-    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster, None);
+    /// let job_entry = SlurmJobEntry::new(&p, &id, &cluster, &hostname, None);
     ///
     /// assert_eq!(job_entry.path_, p);
     /// ```
