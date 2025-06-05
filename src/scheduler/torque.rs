@@ -49,6 +49,8 @@ pub struct TorqueJobEntry {
     jobid_: String,
     /// The name of the cluster
     cluster_: String,
+    /// The hostname of the machine where we read job scripts
+    hostname_: String,
     /// Time of event notification and instance creation
     moment_: Instant,
     /// The actual job script
@@ -58,11 +60,12 @@ pub struct TorqueJobEntry {
 }
 
 impl TorqueJobEntry {
-    fn new(p: &Path, id: &str, cluster: &str) -> TorqueJobEntry {
+    fn new(p: &Path, id: &str, cluster: &str, hostname: &str) -> TorqueJobEntry {
         TorqueJobEntry {
             path_: p.to_path_buf(),
             jobname_: None,
             cluster_: cluster.to_string(),
+            hostname_: hostname.to_string(),
             jobid_: id.to_owned(),
             moment_: Instant::now(),
             script_: None,
@@ -86,56 +89,53 @@ impl JobInfo for TorqueJobEntry {
         self.cluster_.clone()
     }
 
+    fn hostname(&self) -> String {
+        self.hostname_.clone()
+    }
+
     // Retrieve all the information for the job from the spool location
     // This fills up the required data structures to be able to write
     // the backup or ship the information to some consumer
     fn read_job_info(&mut self) -> Result<(), Error> {
         let dir = self.path_.parent().unwrap();
-        let filename = self.path_.strip_prefix(dir).unwrap();
+        let filename = Path::new(self.path_.file_name().unwrap());
         self.jobname_ = Some(filename.to_str().unwrap().to_string());
         self.script_ = Some(utils::read_file(dir, filename, None)?);
 
-        // check for the presence of a .TA file
+        // Check for the presence of a .TA file
         let ta_filename = filename.with_extension("TA");
-        let ta = utils::read_file(dir, &ta_filename, Some(10));
-        if let Ok(ta_contents) = ta {
+        if let Ok(ta_contents) = utils::read_file(dir, &ta_filename, Some(10)) {
             self.env_
                 .insert(ta_filename.to_str().unwrap().to_string(), ta_contents);
+
             // If the job is an array job, there are multiple JB files.
             // The file name pattern is: 2720868-946.master.cluster.JB
             // Split the filename into appropriate parts
-            let fparts = filename.to_str().unwrap().split('.').collect::<Vec<&str>>();
+            let job_prefix = filename.to_str().unwrap().split('.').next().unwrap();
             debug!(
                 "Found TA file, looking for JB files in {:?} with name {}",
-                dir, fparts[0]
+                dir, job_prefix
             );
-            glob(&format!("{}/{}-*.JB", dir.display(), fparts[0]))
+
+            for jb_path in glob(&format!("{}/{}-*.JB", dir.display(), job_prefix))
                 .unwrap()
-                .filter_map(|jb_path| {
-                    if let Ok(jb_path) = jb_path {
-                        let jb_dir = jb_path.parent()?;
-                        let jb_filename = jb_path.strip_prefix(jb_dir).unwrap();
-                        let jb = utils::read_file(jb_dir, jb_filename, Some(10)).unwrap();
-                        Some((jb_filename.to_owned(), jb))
-                    } else {
-                        None
-                    }
-                })
-                .map(|(jb_filename, jb)| {
+                .filter_map(Result::ok)
+            {
+                let jb_filename = Path::new(jb_path.file_name().unwrap());
+                if let Ok(jb_contents) = utils::read_file(dir, jb_filename, Some(10)) {
                     self.env_
-                        .insert(jb_filename.to_str().unwrap().to_string(), jb);
-                    Some(())
-                })
-                .for_each(drop);
+                        .insert(jb_filename.to_str().unwrap().to_string(), jb_contents);
+                }
+            }
 
             return Ok(());
         }
 
-        // If it  was no array job, there should be a single .JB file to pick up.
+        // If it was not an array job, there should be a single .JB file to pick up.
         let jb_filename = filename.with_extension("JB");
-        let jb = utils::read_file(dir, &jb_filename, None)?;
+        let jb_contents = utils::read_file(dir, &jb_filename, None)?;
         self.env_
-            .insert(jb_filename.to_str().unwrap().to_string(), jb);
+            .insert(jb_filename.to_str().unwrap().to_string(), jb_contents);
         Ok(())
     }
 
@@ -176,14 +176,16 @@ impl JobInfo for TorqueJobEntry {
 pub struct Torque {
     pub base: PathBuf,
     pub cluster: String,
+    pub hostname: String,
     pub subdirs: bool,
 }
 
 impl Torque {
-    pub fn new(base: &Path, cluster: &str) -> Torque {
+    pub fn new(base: &Path, cluster: &str, hostname: &str) -> Torque {
         Torque {
             base: base.to_path_buf(),
             cluster: cluster.to_string(),
+            hostname: hostname.to_string(),
             subdirs: true, // FIXME: get from the cli argument
         }
     }
@@ -204,6 +206,7 @@ impl Scheduler for Torque {
                 filename,
                 jobid,
                 &self.cluster,
+                &self.hostname,
             )))
         } else {
             None
@@ -258,7 +261,7 @@ mod tests {
                 .unwrap()
                 .join("tests/torque_job.1/1.mymaster.mycluster.SC"),
         );
-        let mut torque_job_entry = TorqueJobEntry::new(&path, "1", "mycluster");
+        let mut torque_job_entry = TorqueJobEntry::new(&path, "1", "mycluster", "master");
         torque_job_entry.read_job_info().unwrap();
 
         assert!(torque_job_entry
@@ -277,7 +280,7 @@ mod tests {
                 .unwrap()
                 .join("tests/torque_job.2/2.mymaster.mycluster.SC"),
         );
-        let mut torque_job_entry = TorqueJobEntry::new(&path, "2", "mycluster");
+        let mut torque_job_entry = TorqueJobEntry::new(&path, "2", "mycluster", "master");
         torque_job_entry.read_job_info().unwrap();
 
         assert!(torque_job_entry

@@ -47,11 +47,12 @@ pub fn create(
     scheduler: &SchedulerKind,
     spool_path: &Path,
     cluster: &str,
+    hostname: &str,
     filter_regex: &Option<Regex>,
 ) -> Box<dyn Scheduler> {
     match scheduler {
         SchedulerKind::Slurm => Box::new(slurm::Slurm::new(spool_path, cluster, filter_regex)),
-        SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path, cluster)),
+        SchedulerKind::Torque => Box::new(torque::Torque::new(spool_path, cluster, hostname)),
     }
 }
 

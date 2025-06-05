@@ -90,20 +90,25 @@ impl Archive for FileArchive {
     /// Archives the files from the given SlurmJobEntry's path.
     ///
     fn archive(&self, job_entry: &Box<dyn JobInfo>) -> Result<(), Error> {
-        let archive_path = &self.archive_path;
-        let target_path = determine_target_path(archive_path, &self.period);
+        let target_path = determine_target_path(&self.archive_path, &self.period);
         debug!("Target path: {:?}", target_path);
+
         for (fname, fcontents) in job_entry.files().iter() {
             debug!("Creating an entry for {}", fname);
+            let file_path = if self.zip {
+                target_path.join(format!("{}.bz2", fname))
+            } else {
+                target_path.join(fname)
+            };
+
+            let mut file = File::create(&file_path)?;
             if self.zip {
-                let file = File::create(target_path.join(format!("{}.bz2", fname)))?;
                 let mut encoder = BzEncoder::new(file, Compression::best());
                 encoder.write_all(fcontents)?;
                 encoder.finish()?;
             } else {
-                let mut f = File::create(target_path.join(fname))?;
-                f.write_all(fcontents)?;
-            };
+                file.write_all(fcontents)?;
+            }
         }
         Ok(())
     }
@@ -119,22 +124,21 @@ impl Archive for FileArchive {
 ///     - YYYYMMDD in case of a Daily Period
 fn determine_target_path(archive_path: &Path, p: &Period) -> PathBuf {
     let archive_subdir = match p {
-        Period::Yearly => Some(format!("{}", chrono::Local::now().format("%Y"))),
-        Period::Monthly => Some(format!("{}", chrono::Local::now().format("%Y%m"))),
-        Period::Daily => Some(format!("{}", chrono::Local::now().format("%Y%m%d"))),
-        _ => None,
+        Period::Yearly => Some(chrono::Local::now().format("%Y").to_string()),
+        Period::Monthly => Some(chrono::Local::now().format("%Y%m").to_string()),
+        Period::Daily => Some(chrono::Local::now().format("%Y%m%d").to_string()),
+        Period::None => None,
     };
     debug!("Archive subdir is {:?}", &archive_subdir);
-    match archive_subdir {
-        Some(d) => {
-            let archive_subdir_path = archive_path.join(&d);
-            if !Path::exists(&archive_subdir_path) {
-                debug!("Archive subdir {:?} does not yet exist, creating", &d);
-                create_dir_all(&archive_subdir_path).unwrap();
-            }
-            archive_subdir_path
+    if let Some(d) = archive_subdir {
+        let archive_subdir_path = archive_path.join(&d);
+        if !archive_subdir_path.exists() {
+            debug!("Archive subdir {:?} does not yet exist, creating", &d);
+            create_dir_all(&archive_subdir_path).unwrap();
         }
-        None => archive_path.to_path_buf(),
+        archive_subdir_path
+    } else {
+        archive_path.to_path_buf()
     }
 }
 
@@ -209,17 +213,19 @@ mod tests {
         job_id: String,
         moment: Instant,
         cluster: String,
+        hostname: String,
         files: Vec<(String, Vec<u8>)>,
         script: String,
         extra_info: Option<HashMap<String, String>>,
     }
 
     impl DummyJobInfo {
-        fn new(job_id: &str, moment: Instant, cluster: &str) -> Self {
+        fn new(job_id: &str, moment: Instant, cluster: &str, hostname: &str) -> Self {
             DummyJobInfo {
                 job_id: job_id.to_string(),
                 moment,
                 cluster: cluster.to_string(),
+                hostname: hostname.to_string(),
                 files: vec![
                     ("file1.txt".to_string(), b"contents1".to_vec()),
                     ("file2.txt".to_string(), b"contents2".to_vec()),
@@ -241,6 +247,10 @@ mod tests {
 
         fn cluster(&self) -> String {
             self.cluster.clone()
+        }
+
+        fn hostname(&self) -> String {
+            self.hostname.clone()
         }
 
         fn read_job_info(&mut self) -> Result<(), std::io::Error> {
@@ -266,8 +276,9 @@ mod tests {
         let job_id = "123";
         let moment = Instant::now();
         let cluster = "test_cluster";
+        let hostname = "master";
 
-        let dummy_job_info = DummyJobInfo::new(job_id, moment, cluster);
+        let dummy_job_info = DummyJobInfo::new(job_id, moment, cluster, hostname);
 
         assert_eq!(dummy_job_info.jobid(), job_id);
         assert_eq!(dummy_job_info.moment(), moment);
@@ -285,14 +296,14 @@ mod tests {
 
     #[test]
     fn test_dummy_job_info_read_job_info() {
-        let mut dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster");
+        let mut dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster", "master");
         let result = dummy_job_info.read_job_info();
         assert!(result.is_ok()); // Placeholder test, assuming read_job_info always succeeds
     }
 
     #[test]
     fn test_dummy_job_info_files() {
-        let dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster");
+        let dummy_job_info = DummyJobInfo::new("123", Instant::now(), "test_cluster", "master");
         let files = dummy_job_info.files();
         assert_eq!(files.len(), 2);
         assert_eq!(files[0].0, "file1.txt");
@@ -304,8 +315,12 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let archive_path = temp_dir.path().to_owned();
         let period = Period::Daily;
-        let job_info: Box<dyn JobInfo + 'static> =
-            Box::new(DummyJobInfo::new("123", Instant::now(), "test_cluster"));
+        let job_info: Box<dyn JobInfo + 'static> = Box::new(DummyJobInfo::new(
+            "123",
+            Instant::now(),
+            "test_cluster",
+            "master",
+        ));
 
         let file_archive = FileArchive::new(&archive_path, &period, false);
         file_archive.archive(&job_info).unwrap();
@@ -415,7 +430,7 @@ mod tests {
         let mut job = File::create(&job_path).unwrap();
         job.write(b"job script").unwrap();
 
-        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", None);
+        let mut slurm_job_entry = SlurmJobEntry::new(&job_dir, "1234", "mycluster", "master", None);
         if let Err(_) = slurm_job_entry.read_job_info() {
             assert!(false);
         }
