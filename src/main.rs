@@ -25,6 +25,7 @@ use clap::Parser;
 use crossbeam_channel::{bounded, unbounded};
 use crossbeam_utils::sync::Parker;
 use crossbeam_utils::thread::scope;
+use gethostname::gethostname;
 use log::{error, info};
 use regex::Regex;
 use std::path::PathBuf;
@@ -128,6 +129,7 @@ fn main() -> Result<(), std::io::Error> {
     let scheduler = cli.scheduler;
     let archiver: Box<dyn Archive> = archive_builder(cli.archiver).unwrap();
     let cluster = cli.cluster;
+    let hostname = gethostname().to_string_lossy().to_string();
     let filter_regex = if let Some(r) = cli.filter_regex {
         info!("Setting filter regex to {}", &r);
         Regex::new(&r).ok()
@@ -149,7 +151,7 @@ fn main() -> Result<(), std::io::Error> {
 
     // we will watch the locations provided by the scheduler
     let (sender, receiver) = unbounded();
-    let sched = create(&scheduler, &base, &cluster, &filter_regex);
+    let sched = create(&scheduler, &base, &cluster, &hostname, &filter_regex);
     if let Err(e) = scope(|s| {
         let ss = &sig_sender;
         s.spawn(move |_| {
