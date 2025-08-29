@@ -17,7 +17,7 @@ coveralls = { repository = "itkovian/sarchive" }
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-bzip2 = "0.5.0"
+bzip2 = "0.6.0"
 chrono = { version = "~0.4", default-features = false, features = [
     "clock",
     "serde",
