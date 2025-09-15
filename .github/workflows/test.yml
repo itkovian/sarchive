@@ -8,7 +8,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Check semver
-        uses: obi1kenobi/cargo-semver-checks-action@v2.7
+        uses: obi1kenobi/cargo-semver-checks-action@v2.8
         with:
           # Ensure we include all new non-default features here explicitly, except for
           # pass-through mutually-exclusive features from our dependencies such as:
