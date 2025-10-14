@@ -13,5 +13,4 @@ skip-tree = [
 ]
 
 [licenses]
-unlicensed = "warn"
 allow = ["Apache-2.0", "MIT", "MPL-2.0"]
