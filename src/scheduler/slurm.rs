@@ -249,7 +249,7 @@ impl Scheduler for Slurm {
     /// # Arguments
     ///
     /// * _matches: reference the ArgMatches in case we pass command line
-    ///             options, which is not done atm.
+    ///   options, which is not done atm.
     fn watch_locations(&self) -> Vec<PathBuf> {
         (0..=9)
             .map(|hash| self.base.join(format!("hash.{hash}")))
@@ -289,7 +289,7 @@ impl Scheduler for Slurm {
     }
 }
 
-/// Verifies that the path metioned in the event is a that of a file that
+/// Verifies that the path mentioned in the event is a that of a file that
 /// needs archival
 ///
 /// This ignores the path prefix, but verifies that

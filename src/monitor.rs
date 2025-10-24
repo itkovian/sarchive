@@ -27,14 +27,14 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use log::*;
 use notify::event::Event;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::Path;
 
 use super::scheduler::job::JobInfo;
 use super::scheduler::Scheduler;
 
 /// The check_and_queue function verifies that the inotify event pertains
-/// and actual Slurm job entry and pushes the correct information to the
+/// an actual scheduler job entry and pushes the correct information to the
 /// channel so it can be processed later on.
 #[allow(clippy::borrowed_box)]
 fn check_and_queue(
@@ -45,19 +45,26 @@ fn check_and_queue(
     debug!("Event received: {:?}", event);
 
     match scheduler.verify_event_kind(&event) {
-        Some(paths) => scheduler
-            .create_job_info(&paths[0])
-            .ok_or_else(|| {
-                Error::new(
-                    ErrorKind::Other,
-                    "Could not create job info structure".to_owned(),
-                )
-            })
-            .and_then(|jobinfo| {
-                s.send(jobinfo)
-                    .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))
-            }),
-        _ => Ok(()),
+        Some(paths) => {
+            info!(
+                "Event received for a scheduler job entry with path {:?}",
+                &paths[0]
+            );
+            scheduler
+                .create_job_info(&paths[0])
+                .ok_or_else(|| Error::other("Could not create job info structure".to_owned()))
+                .and_then(|jobinfo| {
+                    info!("Sending job info for path {:?}", &paths[0]);
+                    s.send(jobinfo).map_err(|err| Error::other(err.to_string()))
+                })
+        }
+        _ => {
+            info!(
+                "Event does not pertain to a scheduler job entry: {:?}",
+                event
+            );
+            Ok(())
+        }
     }
 }
 
@@ -193,7 +200,7 @@ mod tests {
         let (sig_tx, sig_rx) = unbounded();
 
         // Setup: Create a dummy scheduler
-        let scheduler: Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
+        let scheduler: Box<dyn Scheduler + 'static> = Box::new(DummyScheduler);
 
         // Test: Spawn a thread for the monitor function
         let monitor_thread = std::thread::spawn(move || {
@@ -236,7 +243,7 @@ mod tests {
         let (tx, rx) = unbounded();
 
         // Setup: Create a dummy scheduler
-        let scheduler: Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
+        let scheduler: Box<dyn Scheduler + 'static> = Box::new(DummyScheduler);
 
         // Test: Create a dummy file in the temporary directory
         let dummy_file_path = temp_dir_path.join("dummy_file.txt");
