@@ -206,7 +206,7 @@ mod tests {
         let (sig_tx, sig_rx) = unbounded();
 
         // Setup: Create a dummy scheduler
-        let scheduler: Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
+        let scheduler: Box<dyn Scheduler + 'static> = Box::new(DummyScheduler);
 
         // Test: Spawn a thread for the monitor function
         let monitor_thread = std::thread::spawn(move || {
@@ -249,7 +249,7 @@ mod tests {
         let (tx, rx) = unbounded();
 
         // Setup: Create a dummy scheduler
-        let scheduler: Box<(dyn Scheduler + 'static)> = Box::new(DummyScheduler);
+        let scheduler: Box<dyn Scheduler + 'static> = Box::new(DummyScheduler);
 
         // Test: Create a dummy file in the temporary directory
         let dummy_file_path = temp_dir_path.join("dummy_file.txt");
