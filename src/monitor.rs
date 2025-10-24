@@ -27,7 +27,7 @@ use crossbeam_channel::{select, unbounded, Receiver, Sender};
 use log::*;
 use notify::event::Event;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::path::Path;
 
 use super::scheduler::job::JobInfo;
@@ -52,16 +52,10 @@ fn check_and_queue(
             );
             scheduler
                 .create_job_info(&paths[0])
-                .ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::Other,
-                        "Could not create job info structure".to_owned(),
-                    )
-                })
+                .ok_or_else(|| Error::other("Could not create job info structure".to_owned()))
                 .and_then(|jobinfo| {
                     info!("Sending job info for path {:?}", &paths[0]);
-                    s.send(jobinfo)
-                        .map_err(|err| Error::new(ErrorKind::Other, err.to_string()))
+                    s.send(jobinfo).map_err(|err| Error::other(err.to_string()))
                 })
         }
         _ => {
