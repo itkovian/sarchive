@@ -59,7 +59,7 @@ fn check_and_queue(
                 })
         }
         _ => {
-            info!(
+            debug!(
                 "Event does not pertain to a scheduler job entry: {:?}",
                 event
             );
@@ -70,7 +70,7 @@ fn check_and_queue(
 
 /// The monitor function uses a platform-specific watcher to track inotify events on
 /// the given path, formed by joining the base and the hash path.
-/// At the same time, it check for a notification indicating that it should stop operations
+/// At the same time, it checks for a notification indicating that it should stop operations
 /// upon receipt of which it immediately returns.
 #[allow(clippy::borrowed_box)]
 pub fn monitor(

@@ -22,9 +22,13 @@ SOFTWARE.
 
 use std::collections::HashMap;
 use std::io::Error;
+use std::path::PathBuf;
 use std::time::Instant;
 
 pub trait JobInfo: Send {
+    // Return the path to the job entry directory
+    fn path(&self) -> PathBuf;
+
     // Return the job ID
     fn jobid(&self) -> String;
 

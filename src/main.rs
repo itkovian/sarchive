@@ -177,7 +177,7 @@ fn main() -> Result<(), std::io::Error> {
         let sr = &sig_receiver;
         s.spawn(move |_| {
             match process(archiver, r, sr, cleanup) {
-                Ok(()) => info!("Processing completed succesfully"),
+                Ok(()) => info!("Processing completed successfully"),
                 Err(e) => error!("processing failed: {:?}", e),
             };
         });
@@ -186,6 +186,6 @@ fn main() -> Result<(), std::io::Error> {
         exit(1);
     };
 
-    info!("Sarchive finished");
+    info!("sarchive finished");
     exit(0);
 }

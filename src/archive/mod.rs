@@ -103,8 +103,19 @@ pub fn process(
                         debug!("Waiting for {} ms to elapse before checking files", dur.as_millis());
                         sleep(dur);
                     }
-                    job_entry.read_job_info()?;
-                    archiver.archive(&job_entry)?;
+                    job_entry
+                        .read_job_info()
+                        .map_err(|e| {
+                            error!("Error on reading JobEntry ({}) info for path {:?}", job_entry.jobid(), job_entry.path());
+                            e
+                        })
+                        .and_then(|_| {
+                            archiver.archive(&job_entry)
+                        })
+                        .unwrap_or_else(|_| {
+                            error!("Error on archiving JobEntry ({})", job_entry.jobid());
+                        });
+
                 } else {
                     error!("Error on receiving JobEntry info");
                     break;
