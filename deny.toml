@@ -1,12 +1,9 @@
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/RustSec/advisory-db"]
-vulnerability = "deny"
-unmaintained = "warn"
+unmaintained = "workspace"
 yanked = "warn"
-notice = "warn"
 ignore = [ ]
-severity-threshold = "low"
 
 [bans]
 multiple-versions = "warn"
@@ -16,5 +13,4 @@ skip-tree = [
 ]
 
 [licenses]
-unlicensed = "warn"
 allow = ["Apache-2.0", "MIT", "MPL-2.0"]

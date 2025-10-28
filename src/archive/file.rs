@@ -210,6 +210,7 @@ mod tests {
 
     #[derive(Debug)]
     struct DummyJobInfo {
+        path: PathBuf,
         job_id: String,
         moment: Instant,
         cluster: String,
@@ -222,6 +223,7 @@ mod tests {
     impl DummyJobInfo {
         fn new(job_id: &str, moment: Instant, cluster: &str, hostname: &str) -> Self {
             DummyJobInfo {
+                path: PathBuf::from("/tmp/test"),
                 job_id: job_id.to_string(),
                 moment,
                 cluster: cluster.to_string(),
@@ -237,6 +239,10 @@ mod tests {
     }
 
     impl super::JobInfo for DummyJobInfo {
+        fn path(&self) -> PathBuf {
+            self.path.clone()
+        }
+
         fn jobid(&self) -> String {
             self.job_id.clone()
         }
