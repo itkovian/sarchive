@@ -105,12 +105,10 @@ pub fn process(
                     }
                     if let Err(e) = job_entry.read_job_info() {
                         error!("Error on reading JobEntry ({}) info for path {:?}: {}", job_entry.jobid(), job_entry.path(), e);
-                    } else {
-                        if let Err(e) = archiver.archive(&job_entry) {
+                    } else  if let Err(e) = archiver.archive(&job_entry) {
                             error!("Error on archiving JobEntry ({}) for path {:?}: {}", job_entry.jobid(), job_entry.path(), e);
-                        } else {
-                            info!("JobEntry ({}) archived successfully for path {:?}", job_entry.jobid(), job_entry.path());
-                        }
+                    } else {
+                        info!("JobEntry ({}) archived successfully for path {:?}", job_entry.jobid(), job_entry.path());
                     }
                 } else {
                     error!("Error on receiving JobEntry info");
