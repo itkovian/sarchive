@@ -103,8 +103,13 @@ pub fn process(
                         debug!("Waiting for {} ms to elapse before checking files", dur.as_millis());
                         sleep(dur);
                     }
-                    job_entry.read_job_info()?;
-                    archiver.archive(&job_entry)?;
+                    if let Err(e) = job_entry.read_job_info() {
+                        error!("Error on reading JobEntry ({}) info for path {:?}: {}", job_entry.jobid(), job_entry.path(), e);
+                    } else  if let Err(e) = archiver.archive(&job_entry) {
+                            error!("Error on archiving JobEntry ({}) for path {:?}: {}", job_entry.jobid(), job_entry.path(), e);
+                    } else {
+                        info!("JobEntry ({}) archived successfully for path {:?}", job_entry.jobid(), job_entry.path());
+                    }
                 } else {
                     error!("Error on receiving JobEntry info");
                     break;

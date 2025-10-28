@@ -106,6 +106,11 @@ fn filter_env(r: &Option<Regex>, env: &str) -> bool {
 }
 
 impl JobInfo for SlurmJobEntry {
+    /// Returns the path to the job entry directory
+    fn path(&self) -> PathBuf {
+        self.path_.clone()
+    }
+
     /// Returns the job ID as a `String`
     fn jobid(&self) -> String {
         self.jobid_.clone()

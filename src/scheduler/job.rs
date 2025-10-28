@@ -22,9 +22,13 @@ SOFTWARE.
 
 use std::collections::HashMap;
 use std::io::Error;
+use std::path::PathBuf;
 use std::time::Instant;
 
 pub trait JobInfo: Send {
+    // Return the path to the job entry directory
+    fn path(&self) -> PathBuf;
+
     // Return the job ID
     fn jobid(&self) -> String;
 
@@ -98,6 +102,10 @@ mod tests {
     }
 
     impl JobInfo for DummyJobInfo {
+        fn path(&self) -> PathBuf {
+            PathBuf::from("/tmp/test")
+        }
+
         fn jobid(&self) -> String {
             self.job_id.clone()
         }

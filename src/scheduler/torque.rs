@@ -75,6 +75,10 @@ impl TorqueJobEntry {
 }
 
 impl JobInfo for TorqueJobEntry {
+    fn path(&self) -> PathBuf {
+        self.path_.clone()
+    }
+
     fn jobid(&self) -> String {
         self.jobid_.clone()
     }
