@@ -102,6 +102,10 @@ mod tests {
     }
 
     impl JobInfo for DummyJobInfo {
+        fn path(&self) -> PathBuf {
+            PathBuf::from("/tmp/test")
+        }
+
         fn jobid(&self) -> String {
             self.job_id.clone()
         }

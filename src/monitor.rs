@@ -155,6 +155,10 @@ mod tests {
     struct DummyJobInfo;
 
     impl JobInfo for DummyJobInfo {
+        fn path(&self) -> PathBuf {
+            PathBuf::from("/tmp/test")
+        }
+
         fn jobid(&self) -> String {
             "dummy_job".to_string()
         }

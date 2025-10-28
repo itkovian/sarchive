@@ -225,6 +225,7 @@ mod tests {
 
     use mockito::Server;
     use std::collections::HashMap;
+    use std::path::PathBuf;
 
     use super::*;
     use crate::scheduler::job::JobInfo;
@@ -233,6 +234,10 @@ mod tests {
     struct DummyJobInfo;
 
     impl JobInfo for DummyJobInfo {
+        fn path(&self) -> PathBuf {
+            PathBuf::from("/tmp/test")
+        }
+
         fn jobid(&self) -> String {
             "123".to_string()
         }
