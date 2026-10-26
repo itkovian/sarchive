@@ -65,7 +65,7 @@ fn setup_logging(debug: bool, logfile: Option<PathBuf>) -> Result<(), log::SetLo
 
     match logfile {
         Some(filename) => {
-            let r = fern::log_reopen(&filename, Some(libc::SIGHUP)).unwrap();
+            let r = fern::log_reopen1(&filename, std::iter::once(libc::SIGHUP)).unwrap();
             base_config.chain(r)
         }
         None => base_config.chain(std::io::stdout()),
