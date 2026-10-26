@@ -24,7 +24,6 @@ use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{Args, ValueEnum};
-use enum_display_derive::Display;
 use itertools::Itertools;
 use log::{debug, info};
 use rdkafka::config::ClientConfig;
@@ -33,6 +32,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::io::{Error, ErrorKind};
+use strum::Display;
 
 /// Command line options for the kafka archiver subcommand
 #[derive(Args, Debug)]

@@ -14,3 +14,6 @@ skip-tree = [
 
 [licenses]
 allow = ["Apache-2.0", "MIT", "MPL-2.0"]
+
+[graph]
+targets = ["x86_64-unknown-linux-gnu", "aarch64-apple-darwin"]

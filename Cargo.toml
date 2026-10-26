@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.16.1"
+version = "0.16.2"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2021"
 description = "Archival tool for slurm job scripts"
@@ -27,7 +27,6 @@ crossbeam = "~0.8"
 crossbeam-channel = "^0.5.15"
 crossbeam-queue = "~0.3"
 crossbeam-utils = "~0.8"
-enum-display-derive = "0.1.1"
 fern = { version = "0.7.1", features = ["reopen-1"] }
 gethostname = "1.0.2"
 glob = "0.3.1"
@@ -44,6 +43,7 @@ serde = { version = "~1.0", features = ["derive"], optional = true }
 serde_derive = { version = "~1.0", optional = true }
 serde_json = { version = "~1.0", optional = true }
 signal-hook = "~0.4"
+strum = { version = "0.26", features = ["derive"] }
 
 
 [lib]
