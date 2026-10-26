@@ -24,7 +24,7 @@ use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{Args, ValueEnum};
-use enum_display_derive::Display;
+use strum::Display;
 use itertools::Itertools;
 use log::{debug, info};
 use rdkafka::config::ClientConfig;
