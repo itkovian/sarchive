@@ -31,7 +31,6 @@ use rdkafka::config::ClientConfig;
 use rdkafka::producer::{BaseRecord, DefaultProducerContext, ThreadedProducer};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt::Display;
 use std::io::{Error, ErrorKind};
 
 /// Command line options for the kafka archiver subcommand
