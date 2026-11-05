@@ -1,6 +1,6 @@
 [package]
 name = "sarchive"
-version = "0.16.2"
+version = "0.17.0"
 authors = ["Andy Georges <itkovian@gmail.com>"]
 edition = "2021"
 description = "Archival tool for slurm job scripts"
@@ -22,7 +22,7 @@ chrono = { version = "~0.4", default-features = false, features = [
     "clock",
     "serde",
 ] }
-clap = { version = "~4.6", features = ["derive"] }
+clap = { version = "~4.6", features = ["derive", "env"] }
 crossbeam = "~0.8"
 crossbeam-channel = "^0.5.15"
 crossbeam-queue = "~0.3"
@@ -72,4 +72,5 @@ split-debuginfo = "packed"
 assets = [
     { source = "target/release/sarchive", dest = "/usr/bin/sarchive", mode = "755" },
     { source = ".rpm/sarchive.service", dest = "/usr/lib/systemd/system/sarchive.service", mode = "644" },
+    { source = ".rpm/sarchive.sysconfig", dest = "/etc/sysconfig/sarchive", mode = "600", config = "noreplace" },
 ]

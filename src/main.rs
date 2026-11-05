@@ -127,7 +127,13 @@ fn main() -> Result<(), std::io::Error> {
     }
 
     let scheduler = cli.scheduler;
-    let archiver: Box<dyn Archive> = archive_builder(cli.archiver).unwrap();
+    let archiver: Box<dyn Archive> = match archive_builder(cli.archiver) {
+        Ok(a) => a,
+        Err(e) => {
+            error!("Cannot set up the archiver: {}", e);
+            exit(1);
+        }
+    };
     let cluster = cli.cluster;
     let hostname = gethostname().to_string_lossy().to_string();
     let filter_regex = if let Some(r) = cli.filter_regex {

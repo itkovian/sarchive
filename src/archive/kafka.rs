@@ -24,7 +24,6 @@ use super::Archive;
 use crate::scheduler::job::JobInfo;
 use chrono::{DateTime, Utc};
 use clap::{Args, ValueEnum};
-use itertools::Itertools;
 use log::{debug, info};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{BaseRecord, DefaultProducerContext, ThreadedProducer};
@@ -36,32 +35,108 @@ use strum::Display;
 /// Command line options for the kafka archiver subcommand
 #[derive(Args, Debug)]
 pub struct KafkaArgs {
-    #[arg(long, help = "Comma-separated list of brokers")]
+    #[arg(
+        long,
+        env = "SARCHIVE_KAFKA_BROKERS",
+        help = "Comma-separated list of brokers"
+    )]
     brokers: String,
 
-    #[arg(long, help = "Topic under which to send messages to Kafka", default_value_t = String::from("sarchive"))]
+    #[arg(long, env = "SARCHIVE_KAFKA_TOPIC", help = "Topic under which to send messages to Kafka", default_value_t = String::from("sarchive"))]
     topic: String,
 
-    #[arg(long, help = "Message timeout in ms", default_value_t = String::from("5000"))]
+    #[arg(long, env = "SARCHIVE_KAFKA_MESSAGE_TIMEOUT", help = "Message timeout in ms", default_value_t = String::from("5000"))]
     message_timeout: String,
 
-    #[arg(long, help = "Protocol used to communicate with Kafka", default_value_t = SecurityProtocol::Plaintext)]
+    #[arg(long, env = "SARCHIVE_KAFKA_SECURITY_PROTOCOL", help = "Protocol used to communicate with Kafka", default_value_t = SecurityProtocol::Plaintext)]
     security_protocol: SecurityProtocol,
 
-    #[arg(long, help = "SSL options for the underlying Kafka lib")]
+    #[arg(
+        long,
+        env = "SARCHIVE_KAFKA_SSL",
+        help = "SSL options for the underlying Kafka lib, as comma-separated key=value pairs"
+    )]
     ssl: Option<String>,
 
-    #[arg(long, help = "SASL options for the underlying Kafka lib")]
+    #[arg(
+        long,
+        env = "SARCHIVE_KAFKA_SASL",
+        help = "SASL options for the underlying Kafka lib, as comma-separated key=value pairs"
+    )]
     sasl: Option<String>,
+
+    #[arg(
+        long,
+        env = "SARCHIVE_KAFKA_SASL_PASSWORD",
+        hide_env_values = true,
+        help = "SASL password (sets sasl.password). Prefer the environment variable over the command line, which is visible to other users."
+    )]
+    sasl_password: Option<String>,
+}
+
+/// Parses a comma-separated list of `key=value` pairs. Values may themselves
+/// contain `=`. Malformed entries are an error rather than being dropped.
+fn parse_props(s: &str) -> Result<Vec<(&str, &str)>, Error> {
+    s.split(',')
+        .filter(|e| !e.trim().is_empty())
+        .map(|e| {
+            e.split_once('=')
+                .map(|(k, v)| (k.trim(), v))
+                .filter(|(k, _)| !k.is_empty())
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidInput,
+                        // never echo the entry: it may contain a secret
+                        "Malformed Kafka option, expected comma-separated key=value pairs",
+                    )
+                })
+        })
+        .collect()
 }
 
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Display, ValueEnum, Debug)]
+// Keep Display in sync with the spelling clap's ValueEnum accepts (kebab-case), so
+// `default_value_t` round-trips. KafkaArchive::new maps it to librdkafka's SASL_SSL etc.
+#[strum(serialize_all = "kebab-case")]
 pub enum SecurityProtocol {
     Plaintext,
     Ssl,
     Sasl_plaintext,
     Sasl_ssl,
+}
+
+/// Returns true if the librdkafka property is likely to hold a secret
+/// (passwords, private keys, tokens, ...) and must never be logged.
+fn is_sensitive(key: &str) -> bool {
+    let k = key.to_lowercase();
+    [
+        "password",
+        "secret",
+        "key",
+        "token",
+        "oauthbearer",
+        "credential",
+    ]
+    .iter()
+    .any(|s| k.contains(s))
+}
+
+/// Returns the value to show in logs for the given property: the value itself
+/// for non-sensitive properties, a placeholder otherwise.
+fn loggable<'a>(key: &str, value: &'a str) -> &'a str {
+    if is_sensitive(key) {
+        "<redacted>"
+    } else {
+        value
+    }
+}
+
+/// Returns the property list with sensitive values masked, for use in log output.
+fn redacted<'a>(props: &Option<Vec<(&'a str, &'a str)>>) -> Option<Vec<(&'a str, &'a str)>> {
+    props
+        .as_ref()
+        .map(|v| v.iter().map(|(k, val)| (*k, loggable(k, val))).collect())
 }
 
 pub struct KafkaArchive {
@@ -110,14 +185,20 @@ impl KafkaArchive {
 
         if let Some(ssl) = ssl {
             for (k, v) in ssl.iter() {
-                debug!("Setting kafka ssl property {k} with value {v}");
+                debug!(
+                    "Setting kafka ssl property {k} with value {}",
+                    loggable(k, v)
+                );
                 p.set(*k, *v);
             }
         }
 
         if let Some(sasl) = sasl {
             for (k, v) in sasl.iter() {
-                debug!("Setting kafka sasl property {k} with value {v}");
+                debug!(
+                    "Setting kafka sasl property {k} with value {}",
+                    loggable(k, v)
+                );
                 p.set(*k, *v);
             }
         }
@@ -143,18 +224,16 @@ impl KafkaArchive {
             args.brokers, args.topic, args.security_protocol
         );
 
-        let ssl = args
-            .ssl
-            .as_ref()
-            .map(|s| s.split(',').flat_map(|s| s.split('=')).tuples().collect());
+        let ssl = args.ssl.as_deref().map(parse_props).transpose()?;
 
-        let sasl = args
-            .sasl
-            .as_ref()
-            .map(|s| s.split(',').flat_map(|s| s.split('=')).tuples().collect());
+        let mut sasl = args.sasl.as_deref().map(parse_props).transpose()?;
+        if let Some(pw) = args.sasl_password.as_deref() {
+            sasl.get_or_insert_with(Vec::new)
+                .push(("sasl.password", pw));
+        }
 
-        debug!("Using ssl options {ssl:?}");
-        debug!("Using sasl options {sasl:?}");
+        debug!("Using ssl options {:?}", redacted(&ssl));
+        debug!("Using sasl options {:?}", redacted(&sasl));
 
         Ok(KafkaArchive::new(
             &args.brokers,
@@ -228,6 +307,46 @@ mod tests {
 
     use super::*;
     use crate::scheduler::job::JobInfo;
+
+    #[test]
+    fn test_parse_props() {
+        assert_eq!(
+            parse_props("a=1, b=x=y,,c=").unwrap(),
+            vec![("a", "1"), ("b", "x=y"), ("c", "")]
+        );
+        assert!(parse_props("a=1,oops").is_err());
+        assert!(parse_props("=1").is_err());
+        let err = parse_props("sasl.password").unwrap_err().to_string();
+        assert!(!err.contains("sasl.password"));
+    }
+
+    #[test]
+    fn test_redaction_masks_secrets() {
+        for k in [
+            "sasl.password",
+            "SASL.Password",
+            "ssl.key.password",
+            "ssl.key.pem",
+            "ssl.keystore.password",
+            "sasl.oauthbearer.config",
+            "sasl.oauthbearer.client.secret",
+        ] {
+            assert_eq!(loggable(k, "hunter2"), "<redacted>", "{k} not redacted");
+        }
+        assert_eq!(loggable("sasl.username", "alice"), "alice");
+        assert_eq!(loggable("sasl.mechanism", "PLAIN"), "PLAIN");
+    }
+
+    #[test]
+    fn test_redacted_props_do_not_leak() {
+        let props = Some(vec![
+            ("sasl.username", "alice"),
+            ("sasl.password", "hunter2"),
+        ]);
+        let out = format!("{:?}", redacted(&props));
+        assert!(out.contains("alice"));
+        assert!(!out.contains("hunter2"));
+    }
 
     #[derive(Debug)]
     struct DummyJobInfo;
@@ -319,6 +438,7 @@ mod tests {
             security_protocol,
             ssl,
             sasl,
+            sasl_password: None,
         };
 
         let kafka_archive = KafkaArchive::build(kafka_args).unwrap();

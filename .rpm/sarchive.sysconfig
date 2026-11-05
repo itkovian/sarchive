@@ -1,0 +1,11 @@
+# Configuration for the sarchive service, loaded by systemd (EnvironmentFile).
+# Keep this file readable by root only (mode 0600): it may contain credentials.
+# Environment variables are NOT visible to other users, unlike command line arguments.
+#
+# Kafka settings (used by the `kafka` subcommand):
+#SARCHIVE_KAFKA_BROKERS=mykafka.mydomain:9093
+#SARCHIVE_KAFKA_TOPIC=slurm-job-archival
+#SARCHIVE_KAFKA_SECURITY_PROTOCOL=sasl-ssl
+#SARCHIVE_KAFKA_SASL=sasl.mechanism=PLAIN,sasl.username=sarchive
+#SARCHIVE_KAFKA_SASL_PASSWORD=changeme
+#SARCHIVE_KAFKA_SSL=ssl.ca.location=/etc/pki/tls/certs/ca-bundle.crt

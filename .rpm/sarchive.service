@@ -4,7 +4,15 @@ After=slurmctld.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/sarchive -s /var/spool/slurm/ -a /var/spool/slurm/job-archive
+# Example only: adapt the cluster name, scheduler, spool and archive location to your site.
+# Archive job scripts and environments to files, in a YYYYMMDD subdirectory per day
+# (periods: daily, monthly, yearly, none; add --zip to compress with bzip2).
+ExecStart=/usr/bin/sarchive --cluster mycluster --scheduler slurm --spool /var/spool/slurm file /var/spool/slurm/job-archive daily
+# To ship to Kafka instead, use the line below and put the Kafka settings (brokers, SASL, ...) in
+# /etc/sysconfig/sarchive, see the template installed with the package:
+#ExecStart=/usr/bin/sarchive --cluster mycluster --scheduler slurm --spool /var/spool/slurm kafka
+# Optional site configuration, e.g. Kafka credentials (keep it mode 0600).
+EnvironmentFile=-/etc/sysconfig/sarchive
 Restart=always
 UMask=0066
 
