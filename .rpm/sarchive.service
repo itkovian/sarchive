@@ -5,6 +5,8 @@ After=slurmctld.service
 [Service]
 Type=simple
 ExecStart=/usr/bin/sarchive -s /var/spool/slurm/ -a /var/spool/slurm/job-archive
+# Optional site configuration, e.g. Kafka credentials (keep it mode 0600).
+EnvironmentFile=-/etc/sysconfig/sarchive
 Restart=always
 UMask=0066
 

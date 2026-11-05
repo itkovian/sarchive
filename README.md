@@ -81,7 +81,17 @@ For example,
 `./sarchive --cluster huppel -l /var/log/sarchive.log -s /var/spool/slurm/ kafka --brokers mykafka.mydomain:9092 --topic slurm-job-archival`
 
 Support for SSL and SASL is available, through the `--ssl` and `--sasl` options. Both of these expect a comma-separated
-list of options to pass to the underlying kafka library.
+list of `key=value` options to pass to the underlying kafka library. Malformed entries are rejected at startup.
+
+Every Kafka option can also be given through an environment variable (`SARCHIVE_KAFKA_BROKERS`, `SARCHIVE_KAFKA_TOPIC`,
+`SARCHIVE_KAFKA_MESSAGE_TIMEOUT`, `SARCHIVE_KAFKA_SECURITY_PROTOCOL`, `SARCHIVE_KAFKA_SSL`, `SARCHIVE_KAFKA_SASL`),
+and the SASL password has a dedicated option, `--sasl-password` / `SARCHIVE_KAFKA_SASL_PASSWORD`.
+
+**Do not pass credentials on the command line**: arguments are readable by every local user through `ps` and
+`/proc/<pid>/cmdline`. The RPM's systemd unit loads `/etc/sysconfig/sarchive` (installed with mode 0600), so put
+secrets there instead. Without TLS, Kafka messages (job scripts and environments) are sent in the clear, so use
+`--security-protocol sasl-ssl` or `ssl` for anything beyond a trusted network. Values of options that look like
+secrets are masked in debug logs.
 
 ## Features
 
