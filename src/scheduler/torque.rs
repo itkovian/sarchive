@@ -248,7 +248,7 @@ fn is_job_path(path: &Path) -> Option<(&str, &Path)> {
             _ => None,
         };
     }
-    debug!("{:?} is not a considered job path", &path);
+    debug!("{:?} is not a considered job path", path);
     None
 }
 

@@ -122,7 +122,7 @@ fn main() -> Result<(), std::io::Error> {
 
     // FIXME: Check for permissions to read directory contents
     if !base.is_dir() {
-        error!("Provided spool {:?} is not a valid directory", &base);
+        error!("Provided spool {:?} is not a valid directory", base);
         exit(1);
     }
 
@@ -143,7 +143,7 @@ fn main() -> Result<(), std::io::Error> {
         None
     };
 
-    info!("sarchive starting. Watching spool {:?}.", &base);
+    info!("sarchive starting. Watching spool {:?}.", base);
 
     let notification = Arc::new(AtomicBool::new(false));
     let parker = Parker::new();
@@ -171,10 +171,10 @@ fn main() -> Result<(), std::io::Error> {
             let sl = &sched;
             let b = &base;
             s.spawn(move |_| match monitor(sl, &loc, t, sr) {
-                Ok(_) => info!("Stopped watching location {:?}", &loc),
+                Ok(_) => info!("Stopped watching location {:?}", loc),
                 Err(e) => {
                     error!("{:?}", e);
-                    panic!("Error watching {:?}", &b);
+                    panic!("Error watching {:?}", b);
                 }
             });
         }

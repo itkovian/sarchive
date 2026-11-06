@@ -74,10 +74,10 @@ impl FileArchive {
         if !archive.is_dir() {
             warn!(
                 "Provided archive {:?} is not a valid directory, creating it.",
-                &archive
+                archive
             );
             if let Err(e) = create_dir_all(&archive) {
-                error!("Unable to create archive at {:?}. {}", &archive, e);
+                error!("Unable to create archive at {:?}. {}", archive, e);
                 return Err(e);
             }
         };
@@ -129,11 +129,11 @@ fn determine_target_path(archive_path: &Path, p: &Period) -> PathBuf {
         Period::Daily => Some(chrono::Local::now().format("%Y%m%d").to_string()),
         Period::None => None,
     };
-    debug!("Archive subdir is {:?}", &archive_subdir);
+    debug!("Archive subdir is {:?}", archive_subdir);
     if let Some(d) = archive_subdir {
         let archive_subdir_path = archive_path.join(&d);
         if !archive_subdir_path.exists() {
-            debug!("Archive subdir {:?} does not yet exist, creating", &d);
+            debug!("Archive subdir {:?} does not yet exist, creating", d);
             create_dir_all(&archive_subdir_path).unwrap();
         }
         archive_subdir_path

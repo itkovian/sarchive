@@ -313,7 +313,7 @@ pub fn is_job_path(path: &Path) -> Option<(&str, &str)> {
             return Some((path.extension().unwrap().to_str().unwrap(), dirname));
         };
     }
-    debug!("{:?} is not a considered job path", &path);
+    debug!("{:?} is not a considered job path", path);
     None
 }
 
