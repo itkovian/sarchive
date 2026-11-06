@@ -48,13 +48,13 @@ fn check_and_queue(
         Some(paths) => {
             info!(
                 "Event received for a scheduler job entry with path {:?}",
-                &paths[0]
+                paths[0]
             );
             scheduler
                 .create_job_info(&paths[0])
                 .ok_or_else(|| Error::other("Could not create job info structure".to_owned()))
                 .and_then(|jobinfo| {
-                    info!("Sending job info for path {:?}", &paths[0]);
+                    info!("Sending job info for path {:?}", paths[0]);
                     s.send(jobinfo).map_err(|err| Error::other(err.to_string()))
                 })
         }

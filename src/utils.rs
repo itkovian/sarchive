@@ -47,20 +47,20 @@ pub fn read_file(path: &Path, filename: &Path, iters: Option<u32>) -> Result<Vec
         if fpath.exists() {
             return fs::read(&fpath);
         }
-        debug!("Waiting for {:?}", &fpath);
+        debug!("Waiting for {:?}", fpath);
         sleep(ten_millis);
         if !path.exists() {
-            debug!("Job directory {:?} no longer exists", &path);
+            debug!("Job directory {:?} no longer exists", path);
             return Err(Error::new(
                 ErrorKind::NotFound,
-                format!("Job directory {:?} no longer exists", &path),
+                format!("Job directory {:?} no longer exists", path),
             ));
         }
     }
-    warn!("Timeout waiting for {:?} to appear", &fpath);
+    warn!("Timeout waiting for {:?} to appear", fpath);
     Err(Error::new(
         ErrorKind::NotFound,
-        format!("File {:?} did not appear after waiting 1s", &fpath),
+        format!("File {:?} did not appear after waiting 1s", fpath),
     ))
 }
 

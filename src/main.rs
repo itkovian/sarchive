@@ -103,11 +103,24 @@ struct Cli {
     #[arg(long, required = true)]
     scheduler: SchedulerKind,
 
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Regex; job environment variables whose names match it are left out of the archive (Slurm only)."
+    )]
     filter_regex: Option<String>,
 
     #[command(subcommand)]
     archiver: Archiver,
+}
+
+/// Compiles the optional filter regex. An invalid pattern is an error, never ignored.
+fn parse_filter_regex(pattern: Option<&str>) -> Result<Option<Regex>, regex::Error> {
+    pattern
+        .map(|r| {
+            info!("Setting filter regex to {}", r);
+            Regex::new(r)
+        })
+        .transpose()
 }
 
 fn main() -> Result<(), std::io::Error> {
@@ -122,11 +135,20 @@ fn main() -> Result<(), std::io::Error> {
 
     // FIXME: Check for permissions to read directory contents
     if !base.is_dir() {
-        error!("Provided spool {:?} is not a valid directory", &base);
+        error!("Provided spool {:?} is not a valid directory", base);
         exit(1);
     }
 
     let scheduler = cli.scheduler;
+    // Fail before doing anything else: a filter that silently does not apply would let
+    // environment variables that must not be archived through.
+    let filter_regex = match parse_filter_regex(cli.filter_regex.as_deref()) {
+        Ok(r) => r,
+        Err(e) => {
+            error!("Invalid --filter-regex: {}", e);
+            exit(1);
+        }
+    };
     let archiver: Box<dyn Archive> = match archive_builder(cli.archiver) {
         Ok(a) => a,
         Err(e) => {
@@ -136,14 +158,8 @@ fn main() -> Result<(), std::io::Error> {
     };
     let cluster = cli.cluster;
     let hostname = gethostname().to_string_lossy().to_string();
-    let filter_regex = if let Some(r) = cli.filter_regex {
-        info!("Setting filter regex to {}", &r);
-        Regex::new(&r).ok()
-    } else {
-        None
-    };
 
-    info!("sarchive starting. Watching spool {:?}.", &base);
+    info!("sarchive starting. Watching spool {:?}.", base);
 
     let notification = Arc::new(AtomicBool::new(false));
     let parker = Parker::new();
@@ -171,10 +187,10 @@ fn main() -> Result<(), std::io::Error> {
             let sl = &sched;
             let b = &base;
             s.spawn(move |_| match monitor(sl, &loc, t, sr) {
-                Ok(_) => info!("Stopped watching location {:?}", &loc),
+                Ok(_) => info!("Stopped watching location {:?}", loc),
                 Err(e) => {
                     error!("{:?}", e);
-                    panic!("Error watching {:?}", &b);
+                    panic!("Error watching {:?}", b);
                 }
             });
         }
@@ -194,4 +210,28 @@ fn main() -> Result<(), std::io::Error> {
 
     info!("sarchive finished");
     exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_filter_regex_none() {
+        assert!(parse_filter_regex(None).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_parse_filter_regex_valid() {
+        let r = parse_filter_regex(Some("^EBROOT|^EBVERSION"))
+            .unwrap()
+            .unwrap();
+        assert!(r.is_match("EBROOTGCC"));
+        assert!(!r.is_match("HOME"));
+    }
+
+    #[test]
+    fn test_parse_filter_regex_invalid_is_an_error() {
+        assert!(parse_filter_regex(Some("([unclosed")).is_err());
+    }
 }
