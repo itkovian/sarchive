@@ -23,7 +23,7 @@ use bzip2::write::BzEncoder;
 use bzip2::Compression;
 use clap::{Args, ValueEnum};
 use log::{debug, error, warn};
-use std::fs::{create_dir_all, File};
+use std::fs::{DirBuilder, File, OpenOptions};
 use std::io::{Error, Write};
 use std::path::{Path, PathBuf};
 
@@ -52,6 +52,34 @@ pub enum Period {
     None,
 }
 
+/// Creates the directory, and any missing parents, accessible by its owner only (0700).
+///
+/// Archived job scripts and environments can contain secrets, so they must not depend on a
+/// permissive umask. The mode is still subject to the umask, which can only make it stricter.
+fn create_private_dir(path: &Path) -> std::io::Result<()> {
+    let mut builder = DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(path)
+}
+
+/// Creates (or truncates) the file, readable and writable by its owner only (0600) when it
+/// is newly created. As for directories, the umask can only make this stricter.
+fn create_private_file(path: &Path) -> std::io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    options.open(path)
+}
+
 /// An archiver that writes job script info to a file
 pub struct FileArchive {
     archive_path: PathBuf,
@@ -76,7 +104,7 @@ impl FileArchive {
                 "Provided archive {:?} is not a valid directory, creating it.",
                 archive
             );
-            if let Err(e) = create_dir_all(&archive) {
+            if let Err(e) = create_private_dir(&archive) {
                 error!("Unable to create archive at {:?}. {}", archive, e);
                 return Err(e);
             }
@@ -101,7 +129,7 @@ impl Archive for FileArchive {
                 target_path.join(fname)
             };
 
-            let mut file = File::create(&file_path)?;
+            let mut file = create_private_file(&file_path)?;
             if self.zip {
                 let mut encoder = BzEncoder::new(file, Compression::best());
                 encoder.write_all(fcontents)?;
@@ -134,7 +162,7 @@ fn determine_target_path(archive_path: &Path, p: &Period) -> PathBuf {
         let archive_subdir_path = archive_path.join(&d);
         if !archive_subdir_path.exists() {
             debug!("Archive subdir {:?} does not yet exist, creating", d);
-            create_dir_all(&archive_subdir_path).unwrap();
+            create_private_dir(&archive_subdir_path).unwrap();
         }
         archive_subdir_path
     } else {
@@ -454,5 +482,60 @@ mod tests {
 
         let archive_script_contents = read_to_string(&archive_dir.join("job.1234_script")).unwrap();
         assert_eq!(&archive_script_contents, "job script");
+    }
+
+    #[cfg(unix)]
+    mod permissions {
+        use super::*;
+        use std::os::unix::fs::PermissionsExt;
+
+        // The umask can only remove permission bits, so "no group/other access" holds
+        // whatever umask the tests run under.
+        fn no_group_or_other_access(path: &Path) -> bool {
+            std::fs::metadata(path).unwrap().permissions().mode() & 0o077 == 0
+        }
+
+        #[test]
+        fn test_private_dir_and_parents() {
+            let temp_dir = tempdir().unwrap();
+            let nested = temp_dir.path().join("a").join("b");
+            create_private_dir(&nested).unwrap();
+            assert!(no_group_or_other_access(&nested));
+            assert!(no_group_or_other_access(&temp_dir.path().join("a")));
+            // creating an existing directory is fine
+            create_private_dir(&nested).unwrap();
+        }
+
+        #[test]
+        fn test_private_file() {
+            let temp_dir = tempdir().unwrap();
+            let f = temp_dir.path().join("job.1_script");
+            create_private_file(&f).unwrap().write_all(b"x").unwrap();
+            assert!(no_group_or_other_access(&f));
+        }
+
+        #[test]
+        fn test_archive_output_is_private() {
+            let temp_dir = tempdir().unwrap();
+            let archive_dir = temp_dir.path().join("archive");
+            let archiver = FileArchive::build(FileArgs {
+                archive: archive_dir.clone(),
+                period: Period::Daily,
+                zip: false,
+            })
+            .unwrap();
+            let job: Box<dyn JobInfo> = Box::new(DummyJobInfo::new(
+                "1",
+                std::time::Instant::now(),
+                "cluster",
+                "host",
+            ));
+            archiver.archive(&job).unwrap();
+
+            let day = archive_dir.join(Local::now().format("%Y%m%d").to_string());
+            assert!(no_group_or_other_access(&archive_dir));
+            assert!(no_group_or_other_access(&day));
+            assert!(no_group_or_other_access(&day.join("file1.txt")));
+        }
     }
 }
